@@ -62,6 +62,7 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [actionMode, setActionMode] = useState<ClickActionMode>('reveal');
   const [showNeighborGuide, setShowNeighborGuide] = useState<boolean>(true);
+  const [questionMarkEnabled, setQuestionMarkEnabled] = useState<boolean>(true);
   const [playerHint, setPlayerHint] = useState<PlayerHint | null>(null);
   const [bestTimes, setBestTimes] = useState<BestTimesMap>(getInitialBestTimes);
   const [isNewRecord, setIsNewRecord] = useState<boolean>(false);
@@ -140,6 +141,13 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
     [difficulty, engine]
   );
 
+  const retrySameBoard = useCallback(() => {
+    setElapsedSeconds(0);
+    setPlayerHint(null);
+    setIsNewRecord(false);
+    setSnapshot(engine.retrySameBoard());
+  }, [engine]);
+
   const handleCellPrimaryAction = useCallback(
     (row: number, col: number) => {
       setPlayerHint(null);
@@ -147,11 +155,10 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
       if (!currentCell) return;
 
       let nextSnap: GameSnapshot;
-      // 이미 열린 숫자 셀을 클릭하면 Chording(주변 한 번에 열기) 시도
       if (currentCell.isRevealed && currentCell.neighborMines > 0) {
         nextSnap = engine.chord(row, col);
       } else if (actionMode === 'flag') {
-        nextSnap = engine.toggleFlag(row, col);
+        nextSnap = engine.toggleFlag(row, col, questionMarkEnabled);
       } else {
         nextSnap = engine.reveal(row, col);
       }
@@ -159,16 +166,23 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
       setSnapshot(nextSnap);
       recordWinIfNeeded(nextSnap, elapsedSeconds);
     },
-    [actionMode, elapsedSeconds, engine, recordWinIfNeeded, snapshot.board]
+    [
+      actionMode,
+      elapsedSeconds,
+      engine,
+      questionMarkEnabled,
+      recordWinIfNeeded,
+      snapshot.board,
+    ]
   );
 
   const handleCellSecondaryAction = useCallback(
     (row: number, col: number) => {
       setPlayerHint(null);
-      const nextSnap = engine.toggleFlag(row, col);
+      const nextSnap = engine.toggleFlag(row, col, questionMarkEnabled);
       setSnapshot(nextSnap);
     },
-    [engine]
+    [engine, questionMarkEnabled]
   );
 
   const handleCellChord = useCallback(
@@ -202,7 +216,8 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
     let nextSnap: GameSnapshot;
 
     if (action === 'flag' || action === 'check_flag') {
-      nextSnap = engine.toggleFlag(coord.row, coord.col);
+      // 힌트 적용 시에는 물음표 없이 바로 깃발을 꽂거나 잘못된 깃발을 해제
+      nextSnap = engine.toggleFlag(coord.row, coord.col, false);
     } else {
       nextSnap = engine.reveal(coord.row, coord.col);
     }
@@ -221,6 +236,7 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
     elapsedSeconds,
     actionMode,
     showNeighborGuide,
+    questionMarkEnabled,
     playerHint,
     bestTimes,
     isNewRecord,
@@ -229,7 +245,9 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
     setBoardScale,
     setActionMode,
     setShowNeighborGuide,
+    setQuestionMarkEnabled,
     startNewGame,
+    retrySameBoard,
     handleCellPrimaryAction,
     handleCellSecondaryAction,
     handleCellChord,

@@ -8,7 +8,12 @@ import type {
   GameStatus,
 } from './types';
 import { DIFFICULTY_PRESETS } from './types';
-import { cloneBoard, createEmptyBoard, populateMines } from './board';
+import {
+  calculate3BV,
+  cloneBoard,
+  createEmptyBoard,
+  populateMines,
+} from './board';
 import { runFloodFill } from './floodFill';
 import { getNeighbors, isValidCoord } from '../utils/directions';
 import type { RandomGenerator } from '../utils/random';
@@ -31,6 +36,8 @@ export class MinesweeperEngine {
   private status: GameStatus;
   private minesGenerated: boolean;
   private moveCount: number;
+  private threeBV: number;
+  private usedFlag: boolean;
   private algorithm: FloodFillAlgorithm;
   private lastFloodFillTrace: FloodFillTrace | null;
   private rng: RandomGenerator;
@@ -43,6 +50,8 @@ export class MinesweeperEngine {
     this.status = 'idle';
     this.minesGenerated = false;
     this.moveCount = 0;
+    this.threeBV = 0;
+    this.usedFlag = false;
     this.lastFloodFillTrace = null;
   }
 
@@ -63,6 +72,34 @@ export class MinesweeperEngine {
     this.status = 'idle';
     this.minesGenerated = false;
     this.moveCount = 0;
+    this.threeBV = 0;
+    this.usedFlag = false;
+    this.lastFloodFillTrace = null;
+    return this.getSnapshot();
+  }
+
+  /**
+   * Windows Vista/7 클래식 기능 — 같은 판 다시 하기 (Retry Same Board):
+   * 지뢰 배치는 그대로 유지한 채 열린 칸/깃발/물음표/게임 상태만 초기화합니다.
+   */
+  public retrySameBoard(): GameSnapshot {
+    if (!this.minesGenerated) {
+      return this.reset();
+    }
+
+    this.board = this.board.map((row) =>
+      row.map((cell): CellState => ({
+        row: cell.row,
+        col: cell.col,
+        isMine: cell.isMine,
+        isRevealed: false,
+        isFlagged: false,
+        neighborMines: cell.neighborMines,
+      }))
+    );
+    this.status = 'playing';
+    this.moveCount = 0;
+    this.usedFlag = false;
     this.lastFloodFillTrace = null;
     return this.getSnapshot();
   }
@@ -106,7 +143,14 @@ export class MinesweeperEngine {
         this.rng
       );
       this.minesGenerated = true;
+      this.threeBV = calculate3BV(nextBoard);
       this.status = 'playing';
+    }
+
+    // 물음표 표시가 있던 칸을 열면 물음표 해제
+    if (nextBoard[row]![col]!.isQuestioned) {
+      const { isQuestioned: _, ...rest } = nextBoard[row]![col]!;
+      nextBoard[row]![col] = rest;
     }
 
     this.moveCount += 1;
@@ -130,9 +174,15 @@ export class MinesweeperEngine {
   }
 
   /**
-   * 특정 좌표 (row, col)에 깃발(Flag)을 꽂거나 해제합니다.
+   * 특정 좌표 (row, col)의 표시 상태를 순환합니다.
+   * - allowQuestionMark가 false일 때: 닫힘 <-> 깃발(🚩)
+   * - allowQuestionMark가 true일 때: 닫힘 -> 깃발(🚩) -> 물음표(?) -> 닫힘
    */
-  public toggleFlag(row: number, col: number): GameSnapshot {
+  public toggleFlag(
+    row: number,
+    col: number,
+    allowQuestionMark = false
+  ): GameSnapshot {
     if (
       this.status === 'won' ||
       this.status === 'lost' ||
@@ -147,16 +197,37 @@ export class MinesweeperEngine {
     }
 
     const nextBoard = cloneBoard(this.board, false);
-    nextBoard[row]![col] = {
-      ...cell,
-      isFlagged: !cell.isFlagged,
-    };
+
+    if (!cell.isFlagged && !cell.isQuestioned) {
+      // 닫힘 -> 깃발
+      this.usedFlag = true;
+      nextBoard[row]![col] = {
+        ...cell,
+        isFlagged: true,
+        isQuestioned: false,
+      };
+    } else if (cell.isFlagged && allowQuestionMark) {
+      // 깃발 -> 물음표(?)
+      nextBoard[row]![col] = {
+        ...cell,
+        isFlagged: false,
+        isQuestioned: true,
+      };
+    } else {
+      // 깃발(물음표 꺼짐) 또는 물음표 -> 닫힘
+      const { isQuestioned: _, ...rest } = cell;
+      nextBoard[row]![col] = {
+        ...rest,
+        isFlagged: false,
+      };
+    }
+
     this.board = nextBoard;
     return this.getSnapshot();
   }
 
   /**
-   * 고급 조작 — 코딩(Chording / Quick Reveal):
+   * 고급 조작 — 코딩(Chording / 양클릭 / 화음):
    * 이미 열린 숫자 셀 주변 8칸에 꽂힌 깃발 개수가 해당 셀의 `neighborMines`와 일치할 때,
    * 깃발이 꽂히지 않은 나머지 인접 셀들을 한 번에 오픈합니다.
    */
@@ -215,6 +286,11 @@ export class MinesweeperEngine {
 
     for (const neighbor of unrevealedNeighbors) {
       if (!nextBoard[neighbor.row]![neighbor.col]!.isRevealed) {
+        if (nextBoard[neighbor.row]![neighbor.col]!.isQuestioned) {
+          const { isQuestioned: _, ...rest } =
+            nextBoard[neighbor.row]![neighbor.col]!;
+          nextBoard[neighbor.row]![neighbor.col] = rest;
+        }
         const trace = runFloodFill(nextBoard, neighbor, this.algorithm);
         combinedVisited = [...combinedVisited, ...trace.visitedOrder];
         if (trace.maxFrontierSize > maxFrontier) {
@@ -223,7 +299,6 @@ export class MinesweeperEngine {
       }
     }
 
-    // 통합된 방문 순서 번호 재할당
     combinedVisited.forEach((coord, idx) => {
       const c = nextBoard[coord.row]![coord.col]!;
       nextBoard[coord.row]![coord.col] = {
@@ -246,14 +321,13 @@ export class MinesweeperEngine {
   }
 
   /**
-   * 현재 보드에서 열리지 않은 안전한 셀 하나를 힌트로 반환합니다 (학습 및 디버깅 보조 기능).
+   * 현재 보드에서 열리지 않은 안전한 셀 하나를 힌트로 반환합니다.
    */
   public getSafeHint(): Coordinate | null {
     if (this.status === 'won' || this.status === 'lost') {
       return null;
     }
 
-    // 아직 첫 클릭 전이라면 보드 정중앙 좌표를 추천
     if (!this.minesGenerated) {
       return {
         row: Math.floor(this.config.rows / 2),
@@ -261,7 +335,6 @@ export class MinesweeperEngine {
       };
     }
 
-    // 1순위: 이미 열린 셀과 인접한 안전한 미오픈 셀 (논리적으로 추론 가능한 후보 우선)
     for (let r = 0; r < this.config.rows; r++) {
       for (let c = 0; c < this.config.cols; c++) {
         const cell = this.board[r]![c]!;
@@ -282,7 +355,6 @@ export class MinesweeperEngine {
       }
     }
 
-    // 2순위: 임의의 미오픈 안전 셀
     for (let r = 0; r < this.config.rows; r++) {
       for (let c = 0; c < this.config.cols; c++) {
         const cell = this.board[r]![c]!;
@@ -327,16 +399,13 @@ export class MinesweeperEngine {
       remainingMines: this.config.mines - flaggedCount,
       safeCellsTotal,
       moveCount: this.moveCount,
+      threeBV: this.threeBV,
+      usedFlag: this.usedFlag,
       algorithm: this.algorithm,
       lastFloodFillTrace: this.lastFloodFillTrace,
     };
   }
 
-  /**
-   * Step 04: 승리 조건 판정
-   * (열린 안전 셀 개수 === 전체 셀 수 - 지뢰 수)이면 승리(won)로 전환하고
-   * 남은 모든 지뢰 위치에 자동으로 깃발을 표시합니다.
-   */
   private evaluateWinCondition(): void {
     const totalCells = this.config.rows * this.config.cols;
     const safeCellsTotal = totalCells - this.config.mines;
@@ -353,21 +422,17 @@ export class MinesweeperEngine {
 
     if (revealedSafeCount === safeCellsTotal) {
       this.status = 'won';
-      // 승리 시 아직 깃발이 꽂히지 않은 지뢰 칸에 자동으로 깃발 표시
       for (let r = 0; r < this.config.rows; r++) {
         for (let c = 0; c < this.config.cols; c++) {
           const cell = this.board[r]![c]!;
           if (cell.isMine && !cell.isFlagged) {
-            this.board[r]![c] = { ...cell, isFlagged: true };
+            this.board[r]![c] = { ...cell, isFlagged: true, isQuestioned: false };
           }
         }
       }
     }
   }
 
-  /**
-   * 패배 시 폭발한 지뢰를 표시하고 보드 전체의 지뢰 위치를 공개합니다.
-   */
   private revealAllMinesOnLoss(
     board: CellState[][],
     explodedCoord: Coordinate

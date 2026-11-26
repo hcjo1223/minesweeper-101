@@ -27,6 +27,7 @@ export function App() {
     elapsedSeconds,
     actionMode,
     showNeighborGuide,
+    questionMarkEnabled,
     playerHint,
     bestTimes,
     isNewRecord,
@@ -35,7 +36,9 @@ export function App() {
     setBoardScale,
     setActionMode,
     setShowNeighborGuide,
+    setQuestionMarkEnabled,
     startNewGame,
+    retrySameBoard,
     handleCellPrimaryAction,
     handleCellSecondaryAction,
     handleCellChord,
@@ -171,12 +174,16 @@ export function App() {
             elapsedSeconds={elapsedSeconds}
             actionMode={actionMode}
             showNeighborGuide={showNeighborGuide}
+            questionMarkEnabled={questionMarkEnabled}
             bestTimes={bestTimes}
             onSelectDifficulty={(key) => startNewGame(key)}
             onReset={() => startNewGame(difficulty)}
             onToggleActionMode={setActionMode}
             onToggleNeighborGuide={() =>
               setShowNeighborGuide((prev) => !prev)
+            }
+            onToggleQuestionMark={() =>
+              setQuestionMarkEnabled((prev) => !prev)
             }
             onRequestHint={requestPlayerHint}
           />
@@ -193,6 +200,7 @@ export function App() {
             onCellSecondary={handleCellSecondaryAction}
             onCellChord={handleCellChord}
             onApplyHint={applyPlayerHint}
+            onRetrySameBoard={retrySameBoard}
             onReset={() => startNewGame(difficulty)}
           />
         </div>
@@ -269,7 +277,7 @@ export function App() {
             <strong>Minesweeper 101</strong> — 누구나 쉽게 배우고 즐기는 클래식
             지뢰찾기 &amp; 실전 추론 공략 가이드
           </span>
-          <span className="mono">First-Click Safe · Logic Coach</span>
+          <span className="mono">First-Click Safe · 3BV · Logic Coach</span>
         </div>
       </footer>
     </div>

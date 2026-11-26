@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calculate3BV,
   calculateNeighborMines,
   createEmptyBoard,
   populateMines,
@@ -277,6 +278,96 @@ describe('플레이어 공략 힌트 추론 엔진 (getLogicalPlayerHint)', () =
     expect(hint?.action).toBe('reveal');
     expect(hint?.patternName).toContain('1-1 패턴');
     expect(hint?.coord).toEqual({ row: 0, col: 2 });
+  });
+
+  it('마인 카운팅: 남은 지뢰가 활성 구역에 모두 할당되면 구역 밖의 닫힌 칸을 안전으로 판별한다', () => {
+    // 3x3 보드, 총 지뢰 1개 (0, 2)에 존재.
+    // (1,0)은 0 -> (0,0),(0,1),(1,0),(1,1),(2,0),(2,1) 모두 오픈되고, (0,1)=1이 {(0,2)}만 보지 않게:
+    // (0,0)=열림, (0,1)=열림(1), (0,2)=닫힘(지뢰), (1,0)=열림, (1,1)=열림(1), (1,2)=닫힘(안전? 아님 1이면 (0,2)와 (1,2)가 인접!)
+    // 더 명확한 마인 카운팅: 1x5 보드, 총 지뢰 1개 at (0,0), (0,1)=1(열림), (0,2)=0(열림), (0,3)=0(열림) -> 안됨
+    // 3x4 보드, 지뢰 1개 at (0,0), (0,1)=1(열림), (1,1)=1(열림), (1,2)=0(열림), (2,2)=0(열림)
+    // 닫힌 칸: (0,0)(지뢰), (1,0)(안전), (2,0)(안전 - 구역 밖!), (2,1)(안전 - 구역 밖!)
+    // 단, (0,1)=1의 hidden={(0,0),(1,0)}, (1,1)=1의 hidden={(0,0),(1,0),(2,0)} -> Rule 3(1-1)이 먼저 잡힐 수 있음!
+    // 마인 카운팅만 남기려면: 2x4 보드, 지뢰 1개 at (0,0). (1,1)=1(열림) -> hidden={(0,0),(0,1),(1,0),(2,0)? 2행이라 (1,0)만}
+    // (0,3)이 닫혀 있고 아무 열린 숫자와도 안 닿게 구성!
+    const config = { rows: 2, cols: 4, mines: 1 };
+    const board = createEmptyBoard(config);
+    board[0]![0] = { ...board[0]![0]!, isMine: true };
+    calculateNeighborMines(board);
+
+    // (1,0)=1, (1,1)=1 만 열고 (0,0),(0,1),(0,2),(0,3),(1,2),(1,3)은 닫아둠
+    // (1,0)의 hidden={(0,0),(0,1)}, (1,1)의 hidden={(0,0),(0,1),(0,2),(1,2)} -> 1-1이 먼저 (0,2)를 잡음
+    // 따라서 (1,0)은 닫고 (1,1)=1만 열어두면 (1,1)이 남은 지뢰 1개를 모두 점유 -> 구역 밖 (0,3)은 마인 카운팅으로 안전!
+    board[1]![1] = { ...board[1]![1]!, isRevealed: true };
+
+    const hint = getLogicalPlayerHint(board, config, true, { row: 0, col: 3 });
+    expect(hint?.action).toBe('reveal');
+    expect(hint?.patternName).toContain('마인 카운팅');
+    expect(hint?.coord).toEqual({ row: 0, col: 3 });
+  });
+});
+
+describe('클래식 지뢰찾기 편의 기능 (물음표 순환, 같은 판 재도전, 3BV)', () => {
+  it('물음표 옵션이 켜져 있으면 닫힘 -> 깃발 -> 물음표(?) -> 닫힘 순으로 순환한다', () => {
+    const engine = new MinesweeperEngine({
+      config: DIFFICULTY_PRESETS.beginner,
+      rng: createSeededRandom(12),
+    });
+
+    let snap = engine.toggleFlag(0, 0, true);
+    expect(snap.board[0]![0]!.isFlagged).toBe(true);
+    expect(snap.board[0]![0]!.isQuestioned).toBe(false);
+    expect(snap.remainingMines).toBe(9);
+
+    snap = engine.toggleFlag(0, 0, true);
+    expect(snap.board[0]![0]!.isFlagged).toBe(false);
+    expect(snap.board[0]![0]!.isQuestioned).toBe(true);
+    expect(snap.remainingMines).toBe(10);
+
+    snap = engine.toggleFlag(0, 0, true);
+    expect(snap.board[0]![0]!.isFlagged).toBe(false);
+    expect(snap.board[0]![0]!.isQuestioned).toBeFalsy();
+  });
+
+  it('같은 판 재도전(retrySameBoard) 시 지뢰 배치는 유지한 채 진행 상태만 초기화한다', () => {
+    const engine = new MinesweeperEngine({
+      config: DIFFICULTY_PRESETS.beginner,
+      rng: createSeededRandom(55),
+    });
+
+    const firstSnap = engine.reveal(4, 4);
+    const mineCoords: string[] = [];
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (firstSnap.board[r]![c]!.isMine) {
+          mineCoords.push(`${r},${c}`);
+        }
+      }
+    }
+
+    const retried = engine.retrySameBoard();
+    expect(retried.status).toBe('playing');
+    expect(retried.revealedCount).toBe(0);
+    expect(retried.moveCount).toBe(0);
+
+    const retriedMineCoords: string[] = [];
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (retried.board[r]![c]!.isMine) {
+          retriedMineCoords.push(`${r},${c}`);
+        }
+      }
+    }
+    expect(retriedMineCoords).toEqual(mineCoords);
+  });
+
+  it('calculate3BV는 0-오프닝 영역을 1클릭으로 합산하여 최소 클릭 수를 계산한다', () => {
+    const board = createEmptyBoard({ rows: 3, cols: 3, mines: 1 });
+    board[2]![2] = { ...board[2]![2]!, isMine: true };
+    calculateNeighborMines(board);
+
+    // (0,0)이 0이므로 한 번의 클릭으로 지뢰(2,2)를 제외한 8칸이 전부 열림 -> 3BV === 1
+    expect(calculate3BV(board)).toBe(1);
   });
 });
 

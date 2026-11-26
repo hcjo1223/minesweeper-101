@@ -16,6 +16,8 @@ import {
   HandTap,
   Keyboard,
   Lightbulb,
+  Question,
+  Repeat,
   ShieldCheck,
   WarningCircle,
 } from '@phosphor-icons/react';
@@ -35,6 +37,7 @@ interface MinesweeperBoardProps {
   readonly onCellSecondary: (row: number, col: number) => void;
   readonly onCellChord: (row: number, col: number) => void;
   readonly onApplyHint: () => void;
+  readonly onRetrySameBoard: () => void;
   readonly onReset: () => void;
 }
 
@@ -53,6 +56,7 @@ export function MinesweeperBoard({
   onCellSecondary,
   onCellChord,
   onApplyHint,
+  onRetrySameBoard,
   onReset,
 }: MinesweeperBoardProps) {
   const { board, config, status } = snapshot;
@@ -67,6 +71,8 @@ export function MinesweeperBoard({
   const longPressTimerRef = useRef<number | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef<boolean>(false);
+  const mouseButtonsRef = useRef<number>(0);
+  const suppressNextClickRef = useRef<boolean>(false);
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current !== null) {
@@ -80,6 +86,17 @@ export function MinesweeperBoard({
     row: number,
     col: number
   ) => {
+    if (e.pointerType === 'mouse') {
+      mouseButtonsRef.current = e.buttons;
+      // 좌+우 동시 클릭 (양클릭: buttons === 3) 또는 휠 클릭(button === 1) 지원
+      if (e.buttons === 3 || e.button === 1) {
+        e.preventDefault();
+        suppressNextClickRef.current = true;
+        onCellChord(row, col);
+      }
+      return;
+    }
+
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') {
       return;
     }
@@ -113,12 +130,24 @@ export function MinesweeperBoard({
     pointerStartRef.current = null;
   };
 
-  const handleCellClick = (row: number, col: number) => {
+  const handleCellClick = (
+    e: MouseEvent<HTMLButtonElement>,
+    row: number,
+    col: number
+  ) => {
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false;
       return;
     }
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
     setFocusedCoord({ row, col });
+    if (e.shiftKey) {
+      onCellChord(row, col);
+      return;
+    }
     onCellPrimary(row, col);
   };
 
@@ -128,6 +157,10 @@ export function MinesweeperBoard({
     col: number
   ) => {
     e.preventDefault();
+    if (mouseButtonsRef.current === 3) {
+      mouseButtonsRef.current = 0;
+      return;
+    }
     setFocusedCoord({ row, col });
     onCellSecondary(row, col);
   };
@@ -193,6 +226,15 @@ export function MinesweeperBoard({
           />
         );
       }
+      if (cell.isQuestioned) {
+        return (
+          <Question
+            className="cell-svg-icon question-svg"
+            weight="bold"
+            aria-hidden="true"
+          />
+        );
+      }
       return null;
     }
 
@@ -226,7 +268,9 @@ export function MinesweeperBoard({
   const getCellAriaLabel = (cell: CellState): string => {
     const pos = `${cell.row + 1}행 ${cell.col + 1}열`;
     if (!cell.isRevealed) {
-      return cell.isFlagged ? `${pos}, 깃발 꽂힘` : `${pos}, 닫힌 칸`;
+      if (cell.isFlagged) return `${pos}, 깃발 꽂힘`;
+      if (cell.isQuestioned) return `${pos}, 물음표 표시됨`;
+      return `${pos}, 닫힌 칸`;
     }
     if (cell.isMine) {
       return cell.isExploded ? `${pos}, 폭발한 지뢰` : `${pos}, 지뢰`;
@@ -238,6 +282,10 @@ export function MinesweeperBoard({
 
   const showScaleToggle = config.cols > 9;
   const activeGuideCenter = showNeighborGuide ? hoveredNumberCoord : null;
+  const efficiency =
+    snapshot.threeBV > 0 && snapshot.moveCount > 0
+      ? Math.round((snapshot.threeBV / snapshot.moveCount) * 100)
+      : 100;
 
   return (
     <div className="board-stage">
@@ -280,8 +328,8 @@ export function MinesweeperBoard({
             {status === 'playing' && (
               <p className="status-message playing">
                 <span>
-                  지뢰 위치를 찾으면 깃발(우클릭·길게 누르기)을 꽂고, 깃발을 다
-                  찾은 숫자를 누르면 주변이 한 번에 열립니다.
+                  우클릭으로 깃발·물음표(?)를 표시하고, 깃발을 다 찾은 숫자를
+                  누르면(양클릭/Shift+클릭/휠클릭) 주변이 한 번에 열립니다.
                 </span>
               </p>
             )}
@@ -290,9 +338,10 @@ export function MinesweeperBoard({
                 <span className="status-with-icon">
                   <CheckCircle size={18} weight="bold" aria-hidden="true" />
                   <span>
-                    <strong>클리어 성공!</strong> {elapsedSeconds}초 만에 모든
-                    지뢰를 피해냈습니다.
-                    {isNewRecord ? ' (신기록 달성!)' : ''}
+                    <strong>클리어 성공!</strong> {elapsedSeconds}초 · 3BV{' '}
+                    {snapshot.threeBV} (효율 {efficiency}%)
+                    {!snapshot.usedFlag ? ' · NF(노플래그) 달성!' : ''}
+                    {isNewRecord ? ' · 신기록!' : ''}
                   </span>
                 </span>
                 <button
@@ -310,18 +359,29 @@ export function MinesweeperBoard({
                 <span className="status-with-icon">
                   <WarningCircle size={18} weight="bold" aria-hidden="true" />
                   <span>
-                    <strong>지뢰가 터졌습니다!</strong> 아쉬워요 — 새 게임으로
-                    다시 도전해 보세요.
+                    <strong>지뢰가 터졌습니다!</strong> 같은 지뢰 배치로 다시
+                    도전하거나 새 판을 시작할 수 있습니다.
                   </span>
                 </span>
-                <button
-                  id="banner-play-again-lost"
-                  type="button"
-                  className="banner-action-btn"
-                  onClick={onReset}
-                >
-                  새 게임 시작
-                </button>
+                <div className="banner-actions-row">
+                  <button
+                    id="banner-retry-same-lost"
+                    type="button"
+                    className="banner-action-btn"
+                    onClick={onRetrySameBoard}
+                  >
+                    <Repeat size={14} weight="bold" aria-hidden="true" />
+                    <span>같은 판 재도전</span>
+                  </button>
+                  <button
+                    id="banner-play-again-lost"
+                    type="button"
+                    className="banner-action-btn"
+                    onClick={onReset}
+                  >
+                    새 판 시작
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -409,6 +469,7 @@ export function MinesweeperBoard({
                 'mine-cell',
                 cell.isRevealed ? 'revealed' : 'unrevealed',
                 cell.isFlagged ? 'flagged' : '',
+                !cell.isRevealed && cell.isQuestioned ? 'questioned' : '',
                 cell.isExploded ? 'exploded' : '',
                 cell.isRevealed && cell.neighborMines === 0 && !cell.isMine
                   ? 'empty-zero'
@@ -428,7 +489,7 @@ export function MinesweeperBoard({
                   tabIndex={isRovingFocus ? 0 : -1}
                   className={cellClasses}
                   aria-label={getCellAriaLabel(cell)}
-                  onClick={() => handleCellClick(rIdx, cIdx)}
+                  onClick={(e) => handleCellClick(e, rIdx, cIdx)}
                   onDoubleClick={() => onCellChord(rIdx, cIdx)}
                   onContextMenu={(e) => handleContextMenu(e, rIdx, cIdx)}
                   onMouseEnter={() => {
@@ -461,12 +522,12 @@ export function MinesweeperBoard({
         <span className="legend-item desktop-only-legend">
           <Keyboard size={14} weight="bold" aria-hidden="true" />
           <span>
-            좌클릭 열기 · 우클릭 깃발 · 숫자 클릭 빠른 열기 · 방향키 / F 깃발 / H 힌트 / R 새 게임
+            좌클릭 열기 · 우클릭 깃발/물음표 · 숫자 클릭/양클릭/Shift+클릭 빠른 열기 · 방향키/F/H/R
           </span>
         </span>
         <span className="legend-item mobile-only-legend">
           <HandTap size={14} weight="bold" aria-hidden="true" />
-          <span>짧게 탭: 열기 · 길게 누르기: 깃발 꽂기 · 숫자 탭: 빠른 열기</span>
+          <span>짧게 탭: 열기 · 길게 누르기: 깃발/물음표 · 숫자 탭: 빠른 열기</span>
         </span>
       </div>
     </div>

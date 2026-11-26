@@ -120,3 +120,63 @@ export function populateMines(
   calculateNeighborMines(nextBoard);
   return nextBoard;
 }
+
+/**
+ * 3BV (Bechtel's Board Benchmark Value) 계산
+ * 깃발 없이 좌클릭만으로 보드를 클리어하기 위해 필요한 최소 클릭 수입니다.
+ * 1) 연결된 빈 칸(0) 덩어리(오프닝)마다 1회 클릭 (주변 숫자까지 함께 열림)
+ * 2) 어떤 0-오프닝에도 속하지 않은 나머지 안전 숫자 셀마다 1회 클릭
+ */
+export function calculate3BV(board: readonly (readonly CellState[])[]): number {
+  const rows = board.length;
+  const cols = board[0]?.length ?? 0;
+  if (rows === 0 || cols === 0) return 0;
+
+  const marked: boolean[][] = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => false)
+  );
+  let count = 0;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = board[r]![c]!;
+      if (cell.isMine || cell.neighborMines !== 0 || marked[r]![c]) {
+        continue;
+      }
+
+      // 새로운 0-오프닝 영역 발견 -> 1회 클릭으로 취급하고 연결된 안전 영역 마킹
+      count++;
+      const queue: Coordinate[] = [{ row: r, col: c }];
+      marked[r]![c] = true;
+      let head = 0;
+
+      while (head < queue.length) {
+        const curr = queue[head++]!;
+        const currCell = board[curr.row]![curr.col]!;
+        if (currCell.neighborMines !== 0) continue;
+
+        for (const n of getNeighbors(curr.row, curr.col, rows, cols)) {
+          const neighborCell = board[n.row]![n.col]!;
+          if (!neighborCell.isMine && !marked[n.row]![n.col]) {
+            marked[n.row]![n.col] = true;
+            if (neighborCell.neighborMines === 0) {
+              queue.push(n);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 어떤 0-오프닝에도 포함되지 않은 독립 안전 숫자 셀 카운트
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = board[r]![c]!;
+      if (!cell.isMine && !marked[r]![c]) {
+        count++;
+      }
+    }
+  }
+
+  return count;
+}

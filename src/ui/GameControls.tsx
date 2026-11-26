@@ -6,6 +6,7 @@ import {
   Flag,
   Lightbulb,
   Medal,
+  Question,
   Smiley,
   SmileyWink,
   SmileyXEyes,
@@ -25,11 +26,13 @@ interface GameControlsProps {
   readonly elapsedSeconds: number;
   readonly actionMode: ClickActionMode;
   readonly showNeighborGuide: boolean;
+  readonly questionMarkEnabled: boolean;
   readonly bestTimes: BestTimesMap;
   readonly onSelectDifficulty: (key: DifficultyKey) => void;
   readonly onReset: () => void;
   readonly onToggleActionMode: (mode: ClickActionMode) => void;
   readonly onToggleNeighborGuide: () => void;
+  readonly onToggleQuestionMark: () => void;
   readonly onRequestHint: () => void;
 }
 
@@ -39,11 +42,13 @@ export function GameControls({
   elapsedSeconds,
   actionMode,
   showNeighborGuide,
+  questionMarkEnabled,
   bestTimes,
   onSelectDifficulty,
   onReset,
   onToggleActionMode,
   onToggleNeighborGuide,
+  onToggleQuestionMark,
   onRequestHint,
 }: GameControlsProps) {
   const presets = Object.values(DIFFICULTY_PRESETS);
@@ -143,7 +148,10 @@ export function GameControls({
             </span>
           </div>
 
-          <div className="hud-metric hud-metric-progress" title="안전 칸 탐색률 및 난이도 최고 기록">
+          <div
+            className="hud-metric hud-metric-progress"
+            title="안전 칸 탐색률 및 난이도 최고 기록"
+          >
             <span className="hud-label">
               {bestTime !== undefined ? (
                 <>
@@ -193,6 +201,18 @@ export function GameControls({
           </div>
 
           <button
+            id="toggle-question-mark-btn"
+            type="button"
+            className={`overlay-toggle-btn ${questionMarkEnabled ? 'active' : ''}`}
+            onClick={onToggleQuestionMark}
+            aria-pressed={questionMarkEnabled}
+            title="우클릭/깃발 모드 두 번째 탭으로 물음표(?) 표시를 남깁니다"
+          >
+            <Question size={15} weight="bold" aria-hidden="true" />
+            <span>{questionMarkEnabled ? '물음표: ON' : '물음표: OFF'}</span>
+          </button>
+
+          <button
             id="toggle-neighbor-guide-btn"
             type="button"
             className={`overlay-toggle-btn ${showNeighborGuide ? 'active' : ''}`}
@@ -201,9 +221,7 @@ export function GameControls({
             title="열린 숫자 위에 마우스를 올리면 해당 숫자가 영향을 미치는 주변 8칸 범위를 표시합니다"
           >
             <Crosshair size={15} weight="bold" aria-hidden="true" />
-            <span>
-              {showNeighborGuide ? '주변 8칸 가이드: ON' : '주변 8칸 가이드: OFF'}
-            </span>
+            <span>{showNeighborGuide ? '8칸 가이드: ON' : '8칸 가이드: OFF'}</span>
           </button>
         </div>
       </div>

@@ -71,6 +71,7 @@ export interface CellState {
   readonly isMine: boolean;
   readonly isRevealed: boolean;
   readonly isFlagged: boolean;
+  readonly isQuestioned?: boolean;
   readonly neighborMines: number;
   readonly isExploded?: boolean;
   /**
@@ -121,6 +122,8 @@ export interface GameSnapshot {
   readonly remainingMines: number;
   readonly safeCellsTotal: number;
   readonly moveCount: number;
+  readonly threeBV: number;
+  readonly usedFlag: boolean;
   readonly algorithm: FloodFillAlgorithm;
   readonly lastFloodFillTrace: FloodFillTrace | null;
 }

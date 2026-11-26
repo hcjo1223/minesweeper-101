@@ -3,15 +3,22 @@ import {
   ArrowRight,
   BookOpen,
   Check,
+  CheckCircle,
   Compass,
   Flag,
   Lightbulb,
   Medal,
   Sparkle,
+  Target,
+  WarningCircle,
 } from '@phosphor-icons/react';
 import type { PlayerHint } from '../core/solverHint';
-import { DIFFICULTY_PRESETS, type DifficultyKey, type GameSnapshot } from '../core/types';
-import { PLAYER_GUIDE_STEPS } from './playerGuideData';
+import {
+  DIFFICULTY_PRESETS,
+  type DifficultyKey,
+  type GameSnapshot,
+} from '../core/types';
+import { PLAYER_GUIDE_STEPS, PRACTICE_PUZZLES } from './playerGuideData';
 import type { BestTimesMap } from './useMinesweeper';
 
 interface PlayerGuidePanelProps {
@@ -32,8 +39,23 @@ export function PlayerGuidePanel({
   onApplyHint,
 }: PlayerGuidePanelProps) {
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+  const [quizIndex, setQuizIndex] = useState<number>(0);
+  const [quizFeedback, setQuizFeedback] = useState<{
+    selectedIndex: number;
+    isCorrect: boolean;
+  } | null>(null);
+
+  const isQuizTab = activeStepIndex === PLAYER_GUIDE_STEPS.length;
   const activeStep = PLAYER_GUIDE_STEPS[activeStepIndex] ?? PLAYER_GUIDE_STEPS[0]!;
+  const activeQuiz = PRACTICE_PUZZLES[quizIndex] ?? PRACTICE_PUZZLES[0]!;
   const presets = Object.values(DIFFICULTY_PRESETS);
+
+  const handleSelectQuizCell = (cellIndex: number) => {
+    const cell = activeQuiz.cells[cellIndex];
+    if (!cell || cell.tone !== 'hidden') return;
+    const isCorrect = activeQuiz.targetIndices.includes(cellIndex);
+    setQuizFeedback({ selectedIndex: cellIndex, isCorrect });
+  };
 
   return (
     <aside className="inspector-column" aria-label="실전 지뢰 찾기 코치 및 공략 가이드">
@@ -60,9 +82,9 @@ export function PlayerGuidePanel({
         </div>
 
         <p className="panel-description">
-          어디를 눌러야 할지 막막할 때 <strong>힌트 보기</strong>를 누르면,
-          현재 보드에서 논리적으로 100% 찾아낼 수 있는 지뢰나 안전 칸의{' '}
-          <strong>추론 이유</strong>를 바로 알려드립니다.
+          어디를 눌러야 할지 막막할 때 <strong>힌트 보기</strong>를 누르면
+          부분집합(1-1), 차집합(1-2), 마인 카운팅 등 현재 보드에 적용 가능한{' '}
+          <strong>추론 이유</strong>를 알려드립니다.
         </p>
 
         {playerHint ? (
@@ -109,12 +131,12 @@ export function PlayerGuidePanel({
               </span>
               <p>
                 {snapshot.status === 'idle'
-                  ? '첫 클릭은 100% 안전합니다. 모서리보다는 중앙 부근을 열면 넓은 공간이 한 번에 열리기 쉽습니다.'
+                  ? '첫 클릭은 100% 안전합니다. 모서리보다는 중앙 부근을 열면 넓은 오프닝이 열리기 쉽습니다.'
                   : snapshot.status === 'won'
-                    ? '축하합니다! 더 높은 난이도(중급·고급)로 도전하거나 최고 기록 단축을 노려보세요.'
+                    ? `3BV ${snapshot.threeBV} 보드를 ${snapshot.moveCount}회 클릭으로 클리어했습니다! ${!snapshot.usedFlag ? '깃발 없이 깨는 노플래그(NF)에 성공하셨네요!' : '더 빠른 기록이나 노플래그(NF)에도 도전해 보세요.'}`
                     : snapshot.status === 'lost'
-                      ? '지뢰를 밟았어요! 아래 5단계 공략의 1-1 / 1-2 패턴을 익히면 찍는 횟수를 크게 줄일 수 있습니다.'
-                      : '숫자 주변에 깃발을 다 꽂았다면 그 숫자를 한 번만 클릭해 보세요. 나머지 안전한 칸이 동시에 열립니다.'}
+                      ? '아쉽게 지뢰가 터졌어요! 상단의 "같은 판 재도전"으로 방금 배치 그대로 다시 풀어보거나 새 판을 시작해 보세요.'
+                      : '숫자 주변에 깃발을 다 꽂았다면 숫자를 클릭(양클릭/Shift+클릭)해 보세요. 나머지 안전 칸이 동시에 열립니다.'}
               </p>
             </div>
           </div>
@@ -143,13 +165,13 @@ export function PlayerGuidePanel({
         </div>
       </section>
 
-      {/* 2. 지뢰 찾는 방법 5단계 마스터 가이드 */}
+      {/* 2. 나무위키 정석 공략 5단계 + 실전 연습 퀴즈 */}
       <section className="inspector-panel">
         <div className="panel-header">
           <div>
             <span className="panel-eyebrow">
               <BookOpen size={13} weight="bold" aria-hidden="true" />
-              HOW TO PLAY · 5 STEPS
+              HOW TO PLAY · STRATEGY &amp; QUIZ
             </span>
             <h2 className="panel-title">지뢰 찾는 방법 완벽 가이드</h2>
           </div>
@@ -158,7 +180,7 @@ export function PlayerGuidePanel({
         <div
           className="step-tabs"
           role="tablist"
-          aria-label="지뢰 찾는 방법 5단계"
+          aria-label="지뢰 찾는 방법 및 실전 퀴즈"
         >
           {PLAYER_GUIDE_STEPS.map((item, idx) => (
             <button
@@ -174,60 +196,188 @@ export function PlayerGuidePanel({
               <span className="step-short-title">{item.title}</span>
             </button>
           ))}
+          <button
+            id="guide-tab-quiz"
+            type="button"
+            role="tab"
+            aria-selected={isQuizTab}
+            className={`step-tab-btn step-tab-quiz ${isQuizTab ? 'active' : ''}`}
+            onClick={() => setActiveStepIndex(PLAYER_GUIDE_STEPS.length)}
+          >
+            <span className="step-num mono">Quiz</span>
+            <span className="step-short-title">
+              실전 연습 문제 (직접 풀어보기)
+            </span>
+          </button>
         </div>
 
-        <article className="step-detail-card" role="tabpanel">
-          <div className="step-meta-row">
-            <span className="keyword-tag">{activeStep.badge}</span>
-          </div>
-
-          <h3 className="step-detail-title">
-            {activeStep.stepNumber}: {activeStep.title}
-          </h3>
-
-          <p className="step-summary">{activeStep.summary}</p>
-
-          {/* 시각적 미니 패턴 보드 */}
-          <div className="mini-pattern-box">
-            <div
-              className="mini-pattern-grid"
-              style={{
-                gridTemplateColumns: `repeat(${activeStep.miniBoardCols}, 34px)`,
-              }}
-              aria-label={activeStep.miniBoardCaption}
-            >
-              {activeStep.miniBoard.map((cell, idx) => (
-                <div
-                  key={idx}
-                  className={`mini-cell tone-${cell.tone} ${
-                    cell.numberColor ? `num-${cell.numberColor}` : ''
-                  }`}
+        {isQuizTab ? (
+          <article className="step-detail-card" role="tabpanel">
+            <div className="quiz-selector-row">
+              {PRACTICE_PUZZLES.map((qz, idx) => (
+                <button
+                  key={qz.id}
+                  id={`quiz-select-${idx + 1}`}
+                  type="button"
+                  className={`quiz-pill-btn ${quizIndex === idx ? 'active' : ''}`}
+                  onClick={() => {
+                    setQuizIndex(idx);
+                    setQuizFeedback(null);
+                  }}
                 >
-                  {cell.icon === 'flag' && (
-                    <Flag size={16} weight="fill" aria-hidden="true" />
-                  )}
-                  {cell.icon === 'check' && (
-                    <Check size={16} weight="bold" aria-hidden="true" />
-                  )}
-                  {cell.label && <span className="mono">{cell.label}</span>}
-                </div>
+                  Q{idx + 1}
+                </button>
               ))}
+              <span className="keyword-tag">{activeQuiz.difficultyLabel}</span>
             </div>
-            <p className="mini-pattern-caption">{activeStep.miniBoardCaption}</p>
-          </div>
 
-          <div className="step-insight-box">
-            <strong>
-              <Sparkle size={14} weight="bold" aria-hidden="true" />
-              실전 적용 공식
-            </strong>
-            <p>{activeStep.actionRule}</p>
-          </div>
+            <h3 className="step-detail-title">{activeQuiz.title}</h3>
+            <p className="step-summary">{activeQuiz.prompt}</p>
 
-          <p className="step-pro-tip">
-            <strong>꿀팁:</strong> {activeStep.proTip}
-          </p>
-        </article>
+            <div className="mini-pattern-box">
+              <div
+                className="mini-pattern-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${activeQuiz.cols}, 38px)`,
+                }}
+                aria-label={activeQuiz.title}
+              >
+                {activeQuiz.cells.map((cell, idx) => {
+                  const isHiddenClickable = cell.tone === 'hidden';
+                  const isSelected = quizFeedback?.selectedIndex === idx;
+                  const resultClass =
+                    isSelected && quizFeedback
+                      ? quizFeedback.isCorrect
+                        ? 'quiz-correct'
+                        : 'quiz-wrong'
+                      : '';
+
+                  if (isHiddenClickable) {
+                    return (
+                      <button
+                        key={idx}
+                        id={`quiz-cell-${idx}`}
+                        type="button"
+                        className={`mini-cell mini-cell-interactive tone-${cell.tone} ${resultClass}`}
+                        onClick={() => handleSelectQuizCell(idx)}
+                        aria-label={`연습 보드 ${idx + 1}번 닫힌 칸`}
+                      >
+                        {isSelected && quizFeedback?.isCorrect ? (
+                          activeQuiz.targetType === 'mine' ? (
+                            <Flag size={16} weight="fill" aria-hidden="true" />
+                          ) : (
+                            <Check size={16} weight="bold" aria-hidden="true" />
+                          )
+                        ) : (
+                          <Target size={14} weight="regular" aria-hidden="true" />
+                        )}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`mini-cell tone-${cell.tone} ${
+                        cell.numberColor ? `num-${cell.numberColor}` : ''
+                      }`}
+                    >
+                      {cell.icon === 'flag' && (
+                        <Flag size={16} weight="fill" aria-hidden="true" />
+                      )}
+                      {cell.icon === 'check' && (
+                        <Check size={16} weight="bold" aria-hidden="true" />
+                      )}
+                      {cell.label && <span className="mono">{cell.label}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mini-pattern-caption">
+                표적 표시가 있는 닫힌 칸 중 정답을 직접 클릭해 보세요.
+              </p>
+            </div>
+
+            {quizFeedback && (
+              <div
+                className={`quiz-feedback-box ${
+                  quizFeedback.isCorrect ? 'correct' : 'wrong'
+                }`}
+                role="status"
+              >
+                {quizFeedback.isCorrect ? (
+                  <>
+                    <CheckCircle size={18} weight="bold" aria-hidden="true" />
+                    <span>{activeQuiz.explanation}</span>
+                  </>
+                ) : (
+                  <>
+                    <WarningCircle size={18} weight="bold" aria-hidden="true" />
+                    <span>
+                      아쉬워요! 해당 칸은 아직 확정할 수 없습니다. 두 숫자가
+                      공유하는 칸의 개수를 다시 비교해 보세요.
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </article>
+        ) : (
+          <article className="step-detail-card" role="tabpanel">
+            <div className="step-meta-row">
+              <span className="keyword-tag">{activeStep.badge}</span>
+            </div>
+
+            <h3 className="step-detail-title">
+              {activeStep.stepNumber}: {activeStep.title}
+            </h3>
+
+            <p className="step-summary">{activeStep.summary}</p>
+
+            {/* 시각적 미니 패턴 보드 */}
+            <div className="mini-pattern-box">
+              <div
+                className="mini-pattern-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${activeStep.miniBoardCols}, 34px)`,
+                }}
+                aria-label={activeStep.miniBoardCaption}
+              >
+                {activeStep.miniBoard.map((cell, idx) => (
+                  <div
+                    key={idx}
+                    className={`mini-cell tone-${cell.tone} ${
+                      cell.numberColor ? `num-${cell.numberColor}` : ''
+                    }`}
+                  >
+                    {cell.icon === 'flag' && (
+                      <Flag size={16} weight="fill" aria-hidden="true" />
+                    )}
+                    {cell.icon === 'check' && (
+                      <Check size={16} weight="bold" aria-hidden="true" />
+                    )}
+                    {cell.label && <span className="mono">{cell.label}</span>}
+                  </div>
+                ))}
+              </div>
+              <p className="mini-pattern-caption">
+                {activeStep.miniBoardCaption}
+              </p>
+            </div>
+
+            <div className="step-insight-box">
+              <strong>
+                <Sparkle size={14} weight="bold" aria-hidden="true" />
+                실전 적용 공식
+              </strong>
+              <p>{activeStep.actionRule}</p>
+            </div>
+
+            <p className="step-pro-tip">
+              <strong>꿀팁:</strong> {activeStep.proTip}
+            </p>
+          </article>
+        )}
       </section>
     </aside>
   );
