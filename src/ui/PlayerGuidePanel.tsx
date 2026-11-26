@@ -40,6 +40,7 @@ export function PlayerGuidePanel({
 }: PlayerGuidePanelProps) {
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
   const [quizIndex, setQuizIndex] = useState<number>(0);
+  const [solvedQuizIds, setSolvedQuizIds] = useState<string[]>([]);
   const [quizFeedback, setQuizFeedback] = useState<{
     selectedIndex: number;
     isCorrect: boolean;
@@ -55,7 +56,19 @@ export function PlayerGuidePanel({
     if (!cell || cell.tone !== 'hidden') return;
     const isCorrect = activeQuiz.targetIndices.includes(cellIndex);
     setQuizFeedback({ selectedIndex: cellIndex, isCorrect });
+    if (isCorrect) {
+      setSolvedQuizIds((prev) =>
+        prev.includes(activeQuiz.id) ? prev : [...prev, activeQuiz.id]
+      );
+    }
   };
+
+  const selectQuiz = (idx: number) => {
+    setQuizIndex(idx);
+    setQuizFeedback(null);
+  };
+
+  const hasNextQuiz = quizIndex < PRACTICE_PUZZLES.length - 1;
 
   return (
     <aside className="inspector-column" aria-label="실전 지뢰 찾기 코치 및 공략 가이드">
@@ -165,7 +178,7 @@ export function PlayerGuidePanel({
         </div>
       </section>
 
-      {/* 2. 나무위키 정석 공략 5단계 + 실전 연습 퀴즈 */}
+      {/* 2. 나무위키 정석 공략 5단계 + 실전 연습 퀴즈 (8문항) */}
       <section className="inspector-panel">
         <div className="panel-header">
           <div>
@@ -206,7 +219,8 @@ export function PlayerGuidePanel({
           >
             <span className="step-num mono">Quiz</span>
             <span className="step-short-title">
-              실전 연습 문제 (직접 풀어보기)
+              실전 연습 문제 ({solvedQuizIds.length}/{PRACTICE_PUZZLES.length}{' '}
+              완료)
             </span>
           </button>
         </div>
@@ -214,20 +228,23 @@ export function PlayerGuidePanel({
         {isQuizTab ? (
           <article className="step-detail-card" role="tabpanel">
             <div className="quiz-selector-row">
-              {PRACTICE_PUZZLES.map((qz, idx) => (
-                <button
-                  key={qz.id}
-                  id={`quiz-select-${idx + 1}`}
-                  type="button"
-                  className={`quiz-pill-btn ${quizIndex === idx ? 'active' : ''}`}
-                  onClick={() => {
-                    setQuizIndex(idx);
-                    setQuizFeedback(null);
-                  }}
-                >
-                  Q{idx + 1}
-                </button>
-              ))}
+              {PRACTICE_PUZZLES.map((qz, idx) => {
+                const isSolved = solvedQuizIds.includes(qz.id);
+                return (
+                  <button
+                    key={qz.id}
+                    id={`quiz-select-${idx + 1}`}
+                    type="button"
+                    className={`quiz-pill-btn ${quizIndex === idx ? 'active' : ''} ${
+                      isSolved ? 'solved' : ''
+                    }`}
+                    onClick={() => selectQuiz(idx)}
+                  >
+                    Q{idx + 1}
+                    {isSolved ? ' ✓' : ''}
+                  </button>
+                );
+              })}
               <span className="keyword-tag">{activeQuiz.difficultyLabel}</span>
             </div>
 
@@ -245,11 +262,13 @@ export function PlayerGuidePanel({
                 {activeQuiz.cells.map((cell, idx) => {
                   const isHiddenClickable = cell.tone === 'hidden';
                   const isSelected = quizFeedback?.selectedIndex === idx;
-                  const resultClass =
-                    isSelected && quizFeedback
-                      ? quizFeedback.isCorrect
-                        ? 'quiz-correct'
-                        : 'quiz-wrong'
+                  const showAllTargetsOnSolve =
+                    quizFeedback?.isCorrect &&
+                    activeQuiz.targetIndices.includes(idx);
+                  const resultClass = showAllTargetsOnSolve
+                    ? 'quiz-correct'
+                    : isSelected && quizFeedback && !quizFeedback.isCorrect
+                      ? 'quiz-wrong'
                       : '';
 
                   if (isHiddenClickable) {
@@ -262,7 +281,7 @@ export function PlayerGuidePanel({
                         onClick={() => handleSelectQuizCell(idx)}
                         aria-label={`연습 보드 ${idx + 1}번 닫힌 칸`}
                       >
-                        {isSelected && quizFeedback?.isCorrect ? (
+                        {showAllTargetsOnSolve ? (
                           activeQuiz.targetType === 'mine' ? (
                             <Flag size={16} weight="fill" aria-hidden="true" />
                           ) : (
@@ -308,14 +327,27 @@ export function PlayerGuidePanel({
                 {quizFeedback.isCorrect ? (
                   <>
                     <CheckCircle size={18} weight="bold" aria-hidden="true" />
-                    <span>{activeQuiz.explanation}</span>
+                    <div className="quiz-feedback-content">
+                      <span>{activeQuiz.explanation}</span>
+                      {hasNextQuiz && (
+                        <button
+                          id="quiz-next-btn"
+                          type="button"
+                          className="quiz-next-btn"
+                          onClick={() => selectQuiz(quizIndex + 1)}
+                        >
+                          <span>다음 문제 (Q{quizIndex + 2})</span>
+                          <ArrowRight size={14} weight="bold" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <>
                     <WarningCircle size={18} weight="bold" aria-hidden="true" />
                     <span>
-                      아쉬워요! 해당 칸은 아직 확정할 수 없습니다. 두 숫자가
-                      공유하는 칸의 개수를 다시 비교해 보세요.
+                      아쉬워요! 해당 칸은 아직 확정할 수 없습니다. 주변
+                      숫자들이 공유하는 칸의 개수를 다시 비교해 보세요.
                     </span>
                   </>
                 )}

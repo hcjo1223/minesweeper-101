@@ -68,7 +68,7 @@ export const PLAYER_GUIDE_STEPS: readonly PlayerGuideStep[] = [
     title: '기본 확정 & 조작 (양클릭 · 물음표 · NF)',
     badge: '핵심 조작',
     summary:
-      '가장 기본이 되는 두 가지 확정 규칙과 클래식 지뢰찾기의 빠른 조작법(화음/Chording, 물음표, 노플래그)을 익히세요.',
+      '가장 기본이 되는 두 가지 확정 규칙과 클래식 지뢰찾기의 빠른 조작법(화음/Chording, 물음표, 노플래그)을 익힙세요.',
     actionRule:
       '① 닫힌 칸 수 = 숫자 → 전부 지뢰(깃발). ② 주변 깃발 수 = 숫자 → 나머지 닫힌 칸은 전부 안전(열기). 깃발을 다 꽂은 숫자를 누르면(양클릭/Shift+클릭/휠클릭) 주변이 한 번에 열립니다.',
     proTip:
@@ -175,14 +175,15 @@ export const PLAYER_GUIDE_STEPS: readonly PlayerGuideStep[] = [
 ];
 
 /**
- * 나무위키 '지뢰 찾기/공략' 4절 풀어보기 스타일 실전 인터랙티브 퀴즈
+ * 나무위키 '지뢰 찾기/공략' 4절 풀어보기 스타일 실전 인터랙티브 퀴즈 (8문항)
  */
 export const PRACTICE_PUZZLES: readonly PracticePuzzle[] = [
   {
     id: 'quiz-1-1',
-    difficultyLabel: '쉬움 · 부분집합',
+    difficultyLabel: '쉬움 · 부분집합 1-1',
     title: 'Q1. 100% 안전한 칸 하나를 클릭하세요',
-    prompt: '벽(위쪽 끝)에 붙은 숫자 1과 1을 비교해, 지뢰가 절대 없는 칸을 찾아보세요.',
+    prompt:
+      '벽(위쪽 끝)에 붙은 숫자 1과 1을 비교해, 지뢰가 절대 없는 칸을 찾아보세요.',
     cols: 4,
     targetType: 'safe',
     targetIndices: [6],
@@ -207,7 +208,8 @@ export const PRACTICE_PUZZLES: readonly PracticePuzzle[] = [
     id: 'quiz-1-2',
     difficultyLabel: '보통 · 차집합 1-2',
     title: 'Q2. 100% 지뢰가 있는 칸을 클릭하세요',
-    prompt: '2와 3 사이에 이미 깃발이 1개 꽂혀 있습니다. 반드시 지뢰가 숨어 있는 칸은 어디일까요?',
+    prompt:
+      '2와 3 사이에 이미 깃발이 1개 꽂혀 있습니다. 반드시 지뢰가 숨어 있는 칸은 어디일까요?',
     cols: 4,
     targetType: 'mine',
     targetIndices: [3],
@@ -230,14 +232,15 @@ export const PRACTICE_PUZZLES: readonly PracticePuzzle[] = [
   },
   {
     id: 'quiz-1-2-1',
-    difficultyLabel: '도전 · 1-2-1 복합',
-    title: 'Q3. 가운데가 안전할까요, 양옆이 지뢰일까요? 안전한 칸을 고르세요!',
-    prompt: '가로로 놓인 1 - 2 - 1 패턴에서 100% 안전한 칸(지뢰가 없는 칸)을 클릭하세요.',
+    difficultyLabel: '보통 · 1-2-1 대칭',
+    title: 'Q3. 1-2-1 패턴에서 100% 안전한 칸을 고르세요',
+    prompt:
+      '가로로 놓인 1 - 2 - 1 패턴에서 지뢰가 절대 들어갈 수 없는 안전한 칸을 클릭하세요.',
     cols: 5,
     targetType: 'safe',
     targetIndices: [2],
     explanation:
-      '정답입니다! 가운데 2는 양쪽 1이 담당하는 구역(2행 2열, 2행 4열)에서 지뢰 1개씩을 모두 받아야 하므로, 정중앙(1행 3열)은 100% 안전합니다!',
+      '정답입니다! 가운데 2는 양쪽 1이 담당하는 구역(1행 2열, 1행 4열)에서 지뢰 1개씩을 모두 받아야 하므로, 정중앙(1행 3열)은 100% 안전합니다!',
     cells: [
       { tone: 'hidden' },
       { tone: 'hidden' },
@@ -254,6 +257,144 @@ export const PRACTICE_PUZZLES: readonly PracticePuzzle[] = [
       { tone: 'open' },
       { tone: 'open' },
       { tone: 'open' },
+    ],
+  },
+  {
+    id: 'quiz-1-3',
+    difficultyLabel: '보통 · 차집합 1-3',
+    title: 'Q4. 1-3 패턴에서 100% 지뢰인 칸을 찾으세요',
+    prompt:
+      '2행 2열의 1과 2행 3열의 3이 나란히 있습니다. 두 숫자의 영역 차이로 확정되는 지뢰 칸을 클릭하세요.',
+    cols: 4,
+    targetType: 'mine',
+    targetIndices: [3, 7],
+    explanation:
+      '정답입니다! 2행 2열의 1이 위쪽 2칸(1행 2~3열) 중 1곳에만 지뢰를 두므로, 2행 3열의 3을 채우려면 바깥쪽 2칸(1행 4열, 2행 4열)이 모두 100% 지뢰여야 합니다!',
+    cells: [
+      { tone: 'open' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'open' },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { label: '3', tone: 'focus', numberColor: 3 },
+      { tone: 'hidden' },
+      { tone: 'open' },
+      { tone: 'open' },
+      { label: '1', tone: 'open', numberColor: 1 },
+      { tone: 'hidden' },
+    ],
+  },
+  {
+    id: 'quiz-1-2-2-1',
+    difficultyLabel: '보통 · 1-2-2-1 대칭',
+    title: 'Q5. 1-2-2-1 패턴에서 지뢰 칸 하나를 찾으세요',
+    prompt:
+      '2행에 1 - 2 - 2 - 1이 나란히 놓여 있습니다. 1-2 차집합 원리를 두 번 적용해 지뢰가 확실한 칸을 고르세요.',
+    cols: 4,
+    targetType: 'mine',
+    targetIndices: [1, 2],
+    explanation:
+      '정답입니다! 왼쪽 "1-2"로 1행 3열이 지뢰가 되고, 오른쪽 "2-1"로 1행 2열이 지뢰가 됩니다. 나머지 양쪽 끝(1행 1열, 4열)은 안전해집니다!',
+    cells: [
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { label: '2', tone: 'focus', numberColor: 2 },
+      { label: '2', tone: 'focus', numberColor: 2 },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { tone: 'open' },
+      { tone: 'open' },
+      { tone: 'open' },
+      { tone: 'open' },
+    ],
+  },
+  {
+    id: 'quiz-pit-4-1',
+    difficultyLabel: '도전 · 구덩이 4-1',
+    title: 'Q6. 숫자 4와 1을 비교해 100% 지뢰를 찾으세요',
+    prompt:
+      '가운데 숫자 4와 바로 아래 숫자 1이 영역을 공유합니다. 위쪽에 반드시 지뢰가 숨은 칸을 클릭하세요.',
+    cols: 3,
+    targetType: 'mine',
+    targetIndices: [0, 1, 2],
+    explanation:
+      '정답입니다! 아래 숫자 1의 주변 4칸에는 지뢰가 최대 1개뿐이므로, 중앙 숫자 4를 채우려면 위쪽 3칸(1행 1~3열)에 지뢰 3개가 전부 들어가야 합니다!',
+    cells: [
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '4', tone: 'focus', numberColor: 4 },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { tone: 'hidden' },
+    ],
+  },
+  {
+    id: 'quiz-mine-counting',
+    difficultyLabel: '도전 · 마인 카운팅',
+    title: 'Q7. 남은 지뢰 2개! 100% 안전한 칸을 고르세요',
+    prompt:
+      '가운데 깃발 1개를 제외하면 보드에 남은 지뢰가 총 2개뿐입니다. 마인 카운팅으로 확실히 안전한 칸을 찾으세요.',
+    cols: 5,
+    targetType: 'safe',
+    targetIndices: [2],
+    explanation:
+      '정답입니다! 왼쪽 1이 보는 2칸(1행 1~2열)에 1개, 오른쪽 1이 보는 2칸(1행 4~5열)에 1개가 들어가면 남은 지뢰 2개가 전부 소진되므로 정중앙(1행 3열)은 100% 안전합니다!',
+    cells: [
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { label: '2', tone: 'open', numberColor: 2 },
+      { icon: 'flag', tone: 'flag' },
+      { label: '2', tone: 'open', numberColor: 2 },
+      { label: '1', tone: 'focus', numberColor: 1 },
+    ],
+  },
+  {
+    id: 'quiz-center-ring',
+    difficultyLabel: '마스터 · 중앙 1 고리',
+    title: 'Q8. 사방이 1로 막힌 고리에서 안전한 칸을 찾으세요',
+    prompt:
+      '바깥쪽이 전부 닫힌 상태입니다. 상하좌우 가운데 1들과 모서리 1들의 관계를 따져 100% 안전한 칸 하나를 클릭하세요.',
+    cols: 5,
+    targetType: 'safe',
+    targetIndices: [0, 2, 4, 10, 14, 20, 22, 24],
+    explanation:
+      '정답입니다! 상하좌우의 중앙 1들(총 4구역)에 지뢰 1개씩 총 4개가 들어가야 하는데, 모서리 1들과 모순되지 않으려면 네 변의 한가운데(1행 3열 등)와 네 귀퉁이(1행 1열 등) 8칸은 모두 지뢰일 수 없습니다!',
+    cells: [
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '1', tone: 'open', numberColor: 1 },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { label: '1', tone: 'open', numberColor: 1 },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { tone: 'open' },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { label: '1', tone: 'open', numberColor: 1 },
+      { label: '1', tone: 'focus', numberColor: 1 },
+      { label: '1', tone: 'open', numberColor: 1 },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
+      { tone: 'hidden' },
     ],
   },
 ];

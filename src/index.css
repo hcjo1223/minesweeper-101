@@ -1302,6 +1302,7 @@ button:focus-visible {
 .mini-cell.num-1 { color: var(--num-1); }
 .mini-cell.num-2 { color: var(--num-2); }
 .mini-cell.num-3 { color: var(--num-3); }
+.mini-cell.num-4 { color: var(--num-4); }
 
 .mini-cell-interactive {
   width: 38px;
@@ -1337,14 +1338,20 @@ button:focus-visible {
 
 .quiz-pill-btn {
   min-height: 34px;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.quiz-pill-btn.solved {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
 }
 
 .quiz-pill-btn.active {
@@ -1366,6 +1373,28 @@ button:focus-visible {
 .quiz-feedback-box > svg {
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+.quiz-feedback-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.quiz-next-btn {
+  align-self: flex-end;
+  min-height: 34px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+  background: var(--bg-surface);
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .quiz-feedback-box.correct {
