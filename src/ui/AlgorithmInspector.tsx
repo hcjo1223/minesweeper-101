@@ -1,4 +1,13 @@
 import { useState } from 'react';
+import {
+  BookOpen,
+  ChartBar,
+  Cpu,
+  FileCode,
+  Sparkle,
+  TreeStructure,
+  Waves,
+} from '@phosphor-icons/react';
 import type { FloodFillAlgorithm, GameSnapshot } from '../core/types';
 import { CURRICULUM_STEPS } from './curriculumData';
 
@@ -21,7 +30,10 @@ export function AlgorithmInspector({
       <section className="inspector-panel">
         <div className="panel-header">
           <div>
-            <span className="panel-eyebrow">LIVE TELEMETRY · STEP 03</span>
+            <span className="panel-eyebrow">
+              <ChartBar size={13} weight="bold" aria-hidden="true" />
+              LIVE TELEMETRY · STEP 03
+            </span>
             <h2 className="panel-title">Flood Fill 탐색 인스펙터</h2>
           </div>
           <span className="algo-pill mono">
@@ -30,10 +42,10 @@ export function AlgorithmInspector({
         </div>
 
         <p className="panel-description">
-          인접 지뢰가 <code>0</code>인 빈 칸을 클릭하면 주변 안전 구역이 연쇄
-          확장됩니다. 상단 또는 아래 버튼으로 <strong>BFS</strong>와{' '}
-          <strong>DFS</strong>를 전환하고 보드 위의 탐색 순번(<code>#1, #2…</code>
-          )이 어떻게 달라지는지 비교해 보세요.
+          인접 지뢰가 <code>0</code>인 빈 칸을 열면 주변 안전 구역이 연쇄
+          확장됩니다. <strong>BFS</strong>와 <strong>DFS</strong>를 전환해
+          보드 위의 탐색 순번(<code>#1, #2…</code>)과 색상 그라데이션 차이를
+          비교해 보세요.
         </p>
 
         <div className="algo-comparison-toggle">
@@ -42,9 +54,13 @@ export function AlgorithmInspector({
             type="button"
             className={`algo-switch-card ${snapshot.algorithm === 'bfs' ? 'selected' : ''}`}
             onClick={() => onSelectAlgorithm('bfs')}
+            aria-pressed={snapshot.algorithm === 'bfs'}
           >
             <div className="algo-switch-header">
-              <strong>BFS (너비 우선 탐색)</strong>
+              <strong>
+                <Waves size={15} weight="bold" aria-hidden="true" />
+                BFS (너비 우선)
+              </strong>
               <span className="mono">Queue · O(V+E)</span>
             </div>
             <p>시작점부터 동심원 물결 모양으로 균일하게 확장 (스택 안전)</p>
@@ -55,9 +71,13 @@ export function AlgorithmInspector({
             type="button"
             className={`algo-switch-card ${snapshot.algorithm === 'dfs' ? 'selected' : ''}`}
             onClick={() => onSelectAlgorithm('dfs')}
+            aria-pressed={snapshot.algorithm === 'dfs'}
           >
             <div className="algo-switch-header">
-              <strong>DFS (깊이 우선 탐색)</strong>
+              <strong>
+                <TreeStructure size={15} weight="bold" aria-hidden="true" />
+                DFS (깊이 우선)
+              </strong>
               <span className="mono">Recursion · O(V+E)</span>
             </div>
             <p>한 방향 끝까지 깊숙이 탐색한 뒤 백트래킹하며 확장</p>
@@ -68,22 +88,20 @@ export function AlgorithmInspector({
           <div className="trace-metrics-box" id="flood-fill-telemetry">
             <div className="trace-grid">
               <div className="trace-stat">
-                <span className="trace-stat-label">시작 좌표 (Origin)</span>
+                <span className="trace-stat-label">시작 좌표</span>
                 <span className="trace-stat-value mono">
                   ({trace.origin.row}, {trace.origin.col})
                 </span>
               </div>
               <div className="trace-stat">
-                <span className="trace-stat-label">연쇄 오픈된 셀</span>
+                <span className="trace-stat-label">연쇄 오픈</span>
                 <span className="trace-stat-value mono">
                   {trace.cellsRevealed}칸
                 </span>
               </div>
               <div className="trace-stat">
                 <span className="trace-stat-label">
-                  {trace.algorithm === 'bfs'
-                    ? '최대 큐 길이 (Max Queue)'
-                    : '최대 재귀 깊이 (Max Stack)'}
+                  {trace.algorithm === 'bfs' ? '최대 큐 길이' : '최대 재귀 깊이'}
                 </span>
                 <span className="trace-stat-value mono">
                   {trace.maxFrontierSize}
@@ -100,7 +118,10 @@ export function AlgorithmInspector({
               </div>
               <div className="trace-coords-list mono">
                 {trace.visitedOrder.slice(0, 18).map((coord, idx) => (
-                  <span key={`${coord.row}-${coord.col}-${idx}`} className="coord-chip">
+                  <span
+                    key={`${coord.row}-${coord.col}-${idx}`}
+                    className="coord-chip"
+                  >
                     #{idx + 1} ({coord.row},{coord.col})
                   </span>
                 ))}
@@ -124,7 +145,10 @@ export function AlgorithmInspector({
       <section className="inspector-panel">
         <div className="panel-header">
           <div>
-            <span className="panel-eyebrow">LEARNING ROADMAP · DOCS/</span>
+            <span className="panel-eyebrow">
+              <BookOpen size={13} weight="bold" aria-hidden="true" />
+              LEARNING ROADMAP · DOCS/
+            </span>
             <h2 className="panel-title">5단계 핵심 알고리즘 가이드</h2>
           </div>
         </div>
@@ -152,8 +176,14 @@ export function AlgorithmInspector({
 
         <article className="step-detail-card" role="tabpanel">
           <div className="step-meta-row">
-            <span className="step-file-tag mono">📄 {activeStep.docFile}</span>
-            <span className="step-file-tag mono">⚙️ {activeStep.sourceFile}</span>
+            <span className="step-file-tag mono">
+              <FileCode size={13} weight="bold" aria-hidden="true" />
+              {activeStep.docFile}
+            </span>
+            <span className="step-file-tag mono">
+              <Cpu size={13} weight="bold" aria-hidden="true" />
+              {activeStep.sourceFile}
+            </span>
           </div>
 
           <h3 className="step-detail-title">
@@ -171,7 +201,10 @@ export function AlgorithmInspector({
           <p className="step-summary">{activeStep.summary}</p>
 
           <div className="step-insight-box">
-            <strong>핵심 설계 포인트 (Why This Matters)</strong>
+            <strong>
+              <Sparkle size={14} weight="bold" aria-hidden="true" />
+              핵심 설계 포인트 (Why This Matters)
+            </strong>
             <p>{activeStep.keyInsight}</p>
           </div>
 

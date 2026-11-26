@@ -9,6 +9,24 @@ import {
 } from '../core/types';
 
 export type ClickActionMode = 'reveal' | 'flag';
+export type ThemeMode = 'dark' | 'light';
+export type MobileWorkspaceTab = 'game' | 'lab';
+export type BoardScaleMode = 'fit' | 'comfort';
+
+const THEME_STORAGE_KEY = 'minesweeper-101-theme';
+
+function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'dark';
+}
 
 export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
   const [engine] = useState(
@@ -19,6 +37,9 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
       })
   );
 
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [mobileTab, setMobileTab] = useState<MobileWorkspaceTab>('game');
+  const [boardScale, setBoardScale] = useState<BoardScaleMode>('fit');
   const [difficulty, setDifficulty] =
     useState<DifficultyKey>(initialDifficulty);
   const [snapshot, setSnapshot] = useState<GameSnapshot>(() =>
@@ -28,6 +49,27 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
   const [actionMode, setActionMode] = useState<ClickActionMode>('reveal');
   const [showTraversalOrder, setShowTraversalOrder] = useState<boolean>(true);
   const [hintCoord, setHintCoord] = useState<Coordinate | null>(null);
+
+  // Sync theme attribute to <html> and meta theme-color
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute(
+        'content',
+        theme === 'dark' ? '#0B1120' : '#F1F5F9'
+      );
+    }
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore storage errors
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
 
   // 게임 진행 중일 때만 동작하는 1초 타이머 (Step 04: 타이머 상태 관리)
   useEffect(() => {
@@ -106,12 +148,18 @@ export function useMinesweeper(initialDifficulty: DifficultyKey = 'beginner') {
   }, [engine]);
 
   return {
+    theme,
+    mobileTab,
+    boardScale,
     difficulty,
     snapshot,
     elapsedSeconds,
     actionMode,
     showTraversalOrder,
     hintCoord,
+    toggleTheme,
+    setMobileTab,
+    setBoardScale,
     setActionMode,
     setShowTraversalOrder,
     startNewGame,
