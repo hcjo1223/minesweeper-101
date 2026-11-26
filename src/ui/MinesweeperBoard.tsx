@@ -15,21 +15,26 @@ import {
   Flame,
   HandTap,
   Keyboard,
+  Lightbulb,
   ShieldCheck,
   WarningCircle,
 } from '@phosphor-icons/react';
+import type { PlayerHint } from '../core/solverHint';
 import type { CellState, Coordinate, GameSnapshot } from '../core/types';
 import type { BoardScaleMode } from './useMinesweeper';
 
 interface MinesweeperBoardProps {
   readonly snapshot: GameSnapshot;
-  readonly showTraversalOrder: boolean;
-  readonly hintCoord: Coordinate | null;
+  readonly showNeighborGuide: boolean;
+  readonly playerHint: PlayerHint | null;
+  readonly isNewRecord: boolean;
+  readonly elapsedSeconds: number;
   readonly boardScale: BoardScaleMode;
   readonly onChangeBoardScale: (mode: BoardScaleMode) => void;
   readonly onCellPrimary: (row: number, col: number) => void;
   readonly onCellSecondary: (row: number, col: number) => void;
   readonly onCellChord: (row: number, col: number) => void;
+  readonly onApplyHint: () => void;
   readonly onReset: () => void;
 }
 
@@ -38,20 +43,25 @@ const MOVE_CANCEL_THRESHOLD_PX = 8;
 
 export function MinesweeperBoard({
   snapshot,
-  showTraversalOrder,
-  hintCoord,
+  showNeighborGuide,
+  playerHint,
+  isNewRecord,
+  elapsedSeconds,
   boardScale,
   onChangeBoardScale,
   onCellPrimary,
   onCellSecondary,
   onCellChord,
+  onApplyHint,
   onReset,
 }: MinesweeperBoardProps) {
-  const { board, config, status, lastFloodFillTrace } = snapshot;
+  const { board, config, status } = snapshot;
   const [focusedCoord, setFocusedCoord] = useState<Coordinate>({
     row: 0,
     col: 0,
   });
+  const [hoveredNumberCoord, setHoveredNumberCoord] =
+    useState<Coordinate | null>(null);
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -70,7 +80,6 @@ export function MinesweeperBoard({
     row: number,
     col: number
   ) => {
-    // 터치/펜 입력일 때만 롱프레스(깃발 꽂기) 제스처 활성화
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') {
       return;
     }
@@ -105,7 +114,6 @@ export function MinesweeperBoard({
   };
 
   const handleCellClick = (row: number, col: number) => {
-    // 터치 롱프레스로 이미 깃발이 처리된 경우 후속 click 무시
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false;
       return;
@@ -228,77 +236,102 @@ export function MinesweeperBoard({
       : `${pos}, 빈 안전 칸`;
   };
 
-  const maxTraceOrder = Math.max(1, lastFloodFillTrace?.cellsRevealed ?? 1);
   const showScaleToggle = config.cols > 9;
+  const activeGuideCenter = showNeighborGuide ? hoveredNumberCoord : null;
 
   return (
     <div className="board-stage">
       <div className="board-status-banner" role="status" aria-live="polite">
-        {status === 'idle' && (
-          <p className="status-message idle">
-            <span className="status-badge">
-              <ShieldCheck size={14} weight="bold" aria-hidden="true" />
-              First-Click Safe
-            </span>
-            <span>
-              첫 클릭과 주변 8칸(3×3)에는 지뢰가 배치되지 않습니다. 아무 칸이나
-              눌러 시작하세요.
-            </span>
-          </p>
-        )}
-        {status === 'playing' && (
-          <p className="status-message playing">
-            <span>
-              열린 숫자를 클릭/더블클릭하면 <strong>Chording</strong>으로 주변
-              안전 칸을 한 번에 엽니다. 모바일에서는 길게 눌러(Long-press) 깃발을
-              꽂을 수 있습니다.
-            </span>
-          </p>
-        )}
-        {status === 'won' && (
-          <div className="status-message won">
+        {playerHint && status !== 'won' && status !== 'lost' ? (
+          <div className={`status-message hint-banner hint-${playerHint.action}`}>
             <span className="status-with-icon">
-              <CheckCircle size={18} weight="bold" aria-hidden="true" />
+              <Lightbulb size={18} weight="bold" aria-hidden="true" />
               <span>
-                <strong>클리어 성공!</strong> 모든 안전 구역(
-                {snapshot.safeCellsTotal}칸)을 완벽하게 탐색했습니다.
+                <strong>{playerHint.patternName}</strong> — {playerHint.reason}
               </span>
             </span>
             <button
-              id="banner-play-again-won"
+              id="banner-apply-hint"
               type="button"
               className="banner-action-btn"
-              onClick={onReset}
+              onClick={onApplyHint}
             >
-              다시 플레이
+              {playerHint.action === 'reveal'
+                ? '이 칸 열기'
+                : playerHint.action === 'flag'
+                  ? '깃발 꽂기'
+                  : '깃발 해제'}
             </button>
           </div>
-        )}
-        {status === 'lost' && (
-          <div className="status-message lost">
-            <span className="status-with-icon">
-              <WarningCircle size={18} weight="bold" aria-hidden="true" />
-              <span>
-                <strong>지뢰 폭발!</strong> 탐색 로그를 확인하거나 새 게임을
-                시작해 보세요.
-              </span>
-            </span>
-            <button
-              id="banner-play-again-lost"
-              type="button"
-              className="banner-action-btn"
-              onClick={onReset}
-            >
-              새 게임 시작
-            </button>
-          </div>
+        ) : (
+          <>
+            {status === 'idle' && (
+              <p className="status-message idle">
+                <span className="status-badge">
+                  <ShieldCheck size={14} weight="bold" aria-hidden="true" />
+                  첫 클릭 안심
+                </span>
+                <span>
+                  처음 누르는 칸과 주변 8칸에는 지뢰가 없습니다. 편한 곳을 눌러
+                  게임을 시작하세요!
+                </span>
+              </p>
+            )}
+            {status === 'playing' && (
+              <p className="status-message playing">
+                <span>
+                  지뢰 위치를 찾으면 깃발(우클릭·길게 누르기)을 꽂고, 깃발을 다
+                  찾은 숫자를 누르면 주변이 한 번에 열립니다.
+                </span>
+              </p>
+            )}
+            {status === 'won' && (
+              <div className="status-message won">
+                <span className="status-with-icon">
+                  <CheckCircle size={18} weight="bold" aria-hidden="true" />
+                  <span>
+                    <strong>클리어 성공!</strong> {elapsedSeconds}초 만에 모든
+                    지뢰를 피해냈습니다.
+                    {isNewRecord ? ' (신기록 달성!)' : ''}
+                  </span>
+                </span>
+                <button
+                  id="banner-play-again-won"
+                  type="button"
+                  className="banner-action-btn"
+                  onClick={onReset}
+                >
+                  다시 플레이
+                </button>
+              </div>
+            )}
+            {status === 'lost' && (
+              <div className="status-message lost">
+                <span className="status-with-icon">
+                  <WarningCircle size={18} weight="bold" aria-hidden="true" />
+                  <span>
+                    <strong>지뢰가 터졌습니다!</strong> 아쉬워요 — 새 게임으로
+                    다시 도전해 보세요.
+                  </span>
+                </span>
+                <button
+                  id="banner-play-again-lost"
+                  type="button"
+                  className="banner-action-btn"
+                  onClick={onReset}
+                >
+                  새 게임 시작
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {showScaleToggle && (
         <div className="board-scale-toolbar">
           <span className="scale-hint mono">
-            {config.cols} × {config.rows} Grid
+            {config.cols} × {config.rows} 보드
           </span>
           <div
             className="segmented-control"
@@ -342,25 +375,35 @@ export function MinesweeperBoard({
           }
           role="grid"
           aria-label={`지뢰찾기 보드 (${config.rows}행 ${config.cols}열)`}
+          onMouseLeave={() => setHoveredNumberCoord(null)}
         >
           {board.map((rowCells, rIdx) =>
             rowCells.map((cell, cIdx) => {
-              const isHinted =
-                hintCoord?.row === rIdx && hintCoord?.col === cIdx;
-              const hasTraversalBadge =
-                showTraversalOrder &&
-                cell.isRevealed &&
-                !cell.isMine &&
-                cell.revealOrder !== undefined;
+              const isHintTarget =
+                playerHint?.coord.row === rIdx &&
+                playerHint?.coord.col === cIdx;
+              const isHintRelated =
+                playerHint?.relatedCells.some(
+                  (rc) => rc.row === rIdx && rc.col === cIdx
+                ) ?? false;
 
-              // Perceptual color ramp progress (0.0 -> 1.0) for Flood Fill visualization
-              const traversalProgress =
-                hasTraversalBadge && cell.revealOrder !== undefined
-                  ? Number((cell.revealOrder / maxTraceOrder).toFixed(2))
-                  : 0;
+              const isNeighborHighlighted =
+                activeGuideCenter !== null &&
+                !(
+                  activeGuideCenter.row === rIdx &&
+                  activeGuideCenter.col === cIdx
+                ) &&
+                Math.abs(activeGuideCenter.row - rIdx) <= 1 &&
+                Math.abs(activeGuideCenter.col - cIdx) <= 1;
 
               const isRovingFocus =
                 focusedCoord.row === rIdx && focusedCoord.col === cIdx;
+
+              const hintClass = isHintTarget
+                ? `hint-cell hint-target-${playerHint!.action}`
+                : isHintRelated
+                  ? 'hint-related-cell'
+                  : '';
 
               const cellClasses = [
                 'mine-cell',
@@ -370,8 +413,8 @@ export function MinesweeperBoard({
                 cell.isRevealed && cell.neighborMines === 0 && !cell.isMine
                   ? 'empty-zero'
                   : '',
-                hasTraversalBadge ? 'traversed-cell' : '',
-                isHinted ? 'hint-cell' : '',
+                isNeighborHighlighted ? 'neighbor-guide-cell' : '',
+                hintClass,
               ]
                 .filter(Boolean)
                 .join(' ');
@@ -384,17 +427,22 @@ export function MinesweeperBoard({
                   role="gridcell"
                   tabIndex={isRovingFocus ? 0 : -1}
                   className={cellClasses}
-                  style={
-                    hasTraversalBadge
-                      ? ({
-                          '--traversal-ratio': traversalProgress,
-                        } as CSSProperties)
-                      : undefined
-                  }
                   aria-label={getCellAriaLabel(cell)}
                   onClick={() => handleCellClick(rIdx, cIdx)}
                   onDoubleClick={() => onCellChord(rIdx, cIdx)}
                   onContextMenu={(e) => handleContextMenu(e, rIdx, cIdx)}
+                  onMouseEnter={() => {
+                    if (
+                      showNeighborGuide &&
+                      cell.isRevealed &&
+                      !cell.isMine &&
+                      cell.neighborMines > 0
+                    ) {
+                      setHoveredNumberCoord({ row: rIdx, col: cIdx });
+                    } else {
+                      setHoveredNumberCoord(null);
+                    }
+                  }}
                   onPointerDown={(e) => handlePointerDown(e, rIdx, cIdx)}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerEnd}
@@ -402,14 +450,6 @@ export function MinesweeperBoard({
                   onKeyDown={(e) => handleCellKeyDown(e, rIdx, cIdx)}
                 >
                   {renderCellContent(cell)}
-                  {hasTraversalBadge && (
-                    <span
-                      className="traversal-order-badge"
-                      aria-hidden="true"
-                    >
-                      {cell.revealOrder}
-                    </span>
-                  )}
                 </button>
               );
             })
@@ -420,11 +460,13 @@ export function MinesweeperBoard({
       <div className="board-controls-legend">
         <span className="legend-item desktop-only-legend">
           <Keyboard size={14} weight="bold" aria-hidden="true" />
-          <span>방향키 이동 · Enter/Space 열기 · F 깃발 · R 새 게임</span>
+          <span>
+            좌클릭 열기 · 우클릭 깃발 · 숫자 클릭 빠른 열기 · 방향키 / F 깃발 / H 힌트 / R 새 게임
+          </span>
         </span>
         <span className="legend-item mobile-only-legend">
           <HandTap size={14} weight="bold" aria-hidden="true" />
-          <span>짧게 탭: 열기 · 길게 누르기: 깃발 꽂기</span>
+          <span>짧게 탭: 열기 · 길게 누르기: 깃발 꽂기 · 숫자 탭: 빠른 열기</span>
         </span>
       </div>
     </div>

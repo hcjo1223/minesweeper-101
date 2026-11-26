@@ -6,6 +6,7 @@ import {
 } from '../src/core/board';
 import { floodFillBFS, floodFillDFS } from '../src/core/floodFill';
 import { MinesweeperEngine } from '../src/core/MinesweeperEngine';
+import { getLogicalPlayerHint } from '../src/core/solverHint';
 import { DIFFICULTY_PRESETS } from '../src/core/types';
 import { getNeighbors, isWithinSafeZone } from '../src/utils/directions';
 import { createSeededRandom, fisherYatesShuffle } from '../src/utils/random';
@@ -222,3 +223,60 @@ describe('Step 04 & 05: 게임 루프, 승패 판정 및 헤드리스 코어 엔
     }
   });
 });
+
+describe('플레이어 공략 힌트 추론 엔진 (getLogicalPlayerHint)', () => {
+  it('확정 지뢰 규칙: 남은 지뢰 수와 닫힌 이웃 칸 수가 같으면 깃발 꽂기를 추천한다', () => {
+    const config = { rows: 3, cols: 3, mines: 1 };
+    const board = createEmptyBoard(config);
+    board[0]![2] = { ...board[0]![2]!, isMine: true };
+    calculateNeighborMines(board);
+
+    // (0, 2)만 닫힌 상태로 두고 나머지 안전 칸 모두 오픈
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (!(r === 0 && c === 2)) {
+          board[r]![c] = { ...board[r]![c]!, isRevealed: true };
+        }
+      }
+    }
+
+    const hint = getLogicalPlayerHint(board, config, true, { row: 0, col: 0 });
+    expect(hint?.action).toBe('flag');
+    expect(hint?.coord).toEqual({ row: 0, col: 2 });
+  });
+
+  it('1-2 패턴 추론: 1과 2가 나란히 있을 때 2의 바깥쪽 칸을 지뢰로 정확히 지목한다', () => {
+    const config = { rows: 2, cols: 4, mines: 2 };
+    const board = createEmptyBoard(config);
+    board[0]![1] = { ...board[0]![1]!, isMine: true };
+    board[0]![2] = { ...board[0]![2]!, isMine: true };
+    calculateNeighborMines(board);
+
+    // 아래 행만 전부 오픈 -> 단순 Rule B로는 못 찾고 1-2 부분집합 추론으로만 확정 가능
+    for (let c = 0; c < 4; c++) {
+      board[1]![c] = { ...board[1]![c]!, isRevealed: true };
+    }
+
+    const hint = getLogicalPlayerHint(board, config, true, { row: 0, col: 0 });
+    expect(hint?.action).toBe('flag');
+    expect(hint?.patternName).toContain('1-2 패턴');
+    expect(hint?.coord).toEqual({ row: 0, col: 2 });
+  });
+
+  it('1-1 패턴 추론: 벽에 붙은 1과 1을 비교해 세 번째 바깥 칸이 안전함을 찾아낸다', () => {
+    const config = { rows: 2, cols: 4, mines: 1 };
+    const board = createEmptyBoard(config);
+    board[0]![1] = { ...board[0]![1]!, isMine: true };
+    calculateNeighborMines(board);
+
+    for (let c = 0; c < 4; c++) {
+      board[1]![c] = { ...board[1]![c]!, isRevealed: true };
+    }
+
+    const hint = getLogicalPlayerHint(board, config, true, { row: 0, col: 0 });
+    expect(hint?.action).toBe('reveal');
+    expect(hint?.patternName).toContain('1-1 패턴');
+    expect(hint?.coord).toEqual({ row: 0, col: 2 });
+  });
+});
+

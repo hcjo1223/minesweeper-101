@@ -3,17 +3,18 @@ import {
   ArrowClockwise,
   Bomb,
   BookOpen,
-  Cpu,
   CursorClick,
   Flag,
   GameController,
   Lightbulb,
   Moon,
+  ShieldCheck,
   Sun,
 } from '@phosphor-icons/react';
-import { AlgorithmInspector } from './ui/AlgorithmInspector';
+import { DIFFICULTY_PRESETS } from './core/types';
 import { GameControls } from './ui/GameControls';
 import { MinesweeperBoard } from './ui/MinesweeperBoard';
+import { PlayerGuidePanel } from './ui/PlayerGuidePanel';
 import { useMinesweeper } from './ui/useMinesweeper';
 
 export function App() {
@@ -25,22 +26,24 @@ export function App() {
     snapshot,
     elapsedSeconds,
     actionMode,
-    showTraversalOrder,
-    hintCoord,
+    showNeighborGuide,
+    playerHint,
+    bestTimes,
+    isNewRecord,
     toggleTheme,
     setMobileTab,
     setBoardScale,
     setActionMode,
-    setShowTraversalOrder,
+    setShowNeighborGuide,
     startNewGame,
     handleCellPrimaryAction,
     handleCellSecondaryAction,
     handleCellChord,
-    handleAlgorithmChange,
-    requestSafeHint,
+    requestPlayerHint,
+    applyPlayerHint,
   } = useMinesweeper('beginner');
 
-  // Global keyboard shortcuts for PC convenience: R (Reset), H (Hint)
+  // Global keyboard shortcuts: R (Reset), H (Hint)
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       if (
@@ -56,13 +59,15 @@ export function App() {
         startNewGame(difficulty);
       } else if (e.key === 'h' || e.key === 'H') {
         if (snapshot.status !== 'won' && snapshot.status !== 'lost') {
-          requestSafeHint();
+          requestPlayerHint();
         }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [difficulty, requestSafeHint, snapshot.status, startNewGame]);
+  }, [difficulty, requestPlayerHint, snapshot.status, startNewGame]);
+
+  const currentPreset = DIFFICULTY_PRESETS[difficulty];
 
   return (
     <div className="app-shell">
@@ -73,11 +78,11 @@ export function App() {
               <Bomb size={22} weight="duotone" />
             </div>
             <div className="brand-copy">
-              <span className="brand-tag mono">MINESWEEPER 101 · LAB</span>
+              <span className="brand-tag mono">MINESWEEPER 101</span>
               <h1 className="site-title">
                 Minesweeper 101
                 <span className="site-subtitle">
-                  Play the classic game, master the underlying algorithms
+                  누구나 논리로 쉽게 푸는 클래식 지뢰찾기 &amp; 실전 공략 가이드
                 </span>
               </h1>
             </div>
@@ -85,14 +90,14 @@ export function App() {
 
           <div className="header-meta">
             <div className="architecture-indicator desktop-only-pill">
-              <Cpu size={14} weight="bold" aria-hidden="true" />
-              <span className="arch-label">Core</span>
-              <code className="mono">Headless TS</code>
+              <ShieldCheck size={14} weight="bold" aria-hidden="true" />
+              <span className="arch-label">첫 클릭</span>
+              <code className="mono">100% 안전</code>
             </div>
 
             <div className="architecture-indicator">
-              <span className="arch-label">Flood Fill</span>
-              <code className="mono">{snapshot.algorithm.toUpperCase()}</code>
+              <span className="arch-label">난이도</span>
+              <code className="mono">{currentPreset.label.split(' ')[0]}</code>
             </div>
 
             <button
@@ -123,7 +128,7 @@ export function App() {
       {/* Mobile / Tablet View Switcher (< 1024px) */}
       <nav
         className="mobile-view-switcher"
-        aria-label="모바일 작업 화면 전환"
+        aria-label="모바일 화면 전환"
       >
         <button
           id="mobile-tab-game"
@@ -139,21 +144,19 @@ export function App() {
           <span>지뢰찾기 게임</span>
         </button>
         <button
-          id="mobile-tab-lab"
+          id="mobile-tab-guide"
           type="button"
-          className={`mobile-view-tab ${mobileTab === 'lab' ? 'active' : ''}`}
+          className={`mobile-view-tab ${mobileTab === 'guide' ? 'active' : ''}`}
           onClick={() => {
-            setMobileTab('lab');
+            setMobileTab('guide');
             window.scrollTo({ top: 0 });
           }}
-          aria-pressed={mobileTab === 'lab'}
+          aria-pressed={mobileTab === 'guide'}
         >
           <BookOpen size={18} weight="bold" aria-hidden="true" />
-          <span>알고리즘 &amp; 학습</span>
-          {snapshot.lastFloodFillTrace && (
-            <span className="mobile-tab-badge mono">
-              {snapshot.lastFloodFillTrace.cellsRevealed}
-            </span>
+          <span>지뢰 찾는 법</span>
+          {playerHint && (
+            <span className="mobile-tab-badge mono">힌트</span>
           )}
         </button>
       </nav>
@@ -167,36 +170,43 @@ export function App() {
             snapshot={snapshot}
             elapsedSeconds={elapsedSeconds}
             actionMode={actionMode}
-            showTraversalOrder={showTraversalOrder}
+            showNeighborGuide={showNeighborGuide}
+            bestTimes={bestTimes}
             onSelectDifficulty={(key) => startNewGame(key)}
             onReset={() => startNewGame(difficulty)}
             onToggleActionMode={setActionMode}
-            onSelectAlgorithm={handleAlgorithmChange}
-            onToggleTraversalOrder={() =>
-              setShowTraversalOrder((prev) => !prev)
+            onToggleNeighborGuide={() =>
+              setShowNeighborGuide((prev) => !prev)
             }
-            onRequestHint={requestSafeHint}
+            onRequestHint={requestPlayerHint}
           />
 
           <MinesweeperBoard
             snapshot={snapshot}
-            showTraversalOrder={showTraversalOrder}
-            hintCoord={hintCoord}
+            showNeighborGuide={showNeighborGuide}
+            playerHint={playerHint}
+            isNewRecord={isNewRecord}
+            elapsedSeconds={elapsedSeconds}
             boardScale={boardScale}
             onChangeBoardScale={setBoardScale}
             onCellPrimary={handleCellPrimaryAction}
             onCellSecondary={handleCellSecondaryAction}
             onCellChord={handleCellChord}
+            onApplyHint={applyPlayerHint}
             onReset={() => startNewGame(difficulty)}
           />
         </div>
 
         <div
-          className={`lab-column-wrapper ${mobileTab === 'lab' ? 'mobile-visible' : 'mobile-hidden'}`}
+          className={`lab-column-wrapper ${mobileTab === 'guide' ? 'mobile-visible' : 'mobile-hidden'}`}
         >
-          <AlgorithmInspector
+          <PlayerGuidePanel
             snapshot={snapshot}
-            onSelectAlgorithm={handleAlgorithmChange}
+            difficulty={difficulty}
+            bestTimes={bestTimes}
+            playerHint={playerHint}
+            onRequestHint={requestPlayerHint}
+            onApplyHint={applyPlayerHint}
           />
         </div>
       </main>
@@ -234,7 +244,7 @@ export function App() {
             id="mobile-btn-hint"
             type="button"
             className="dock-btn"
-            onClick={requestSafeHint}
+            onClick={requestPlayerHint}
             disabled={snapshot.status === 'won' || snapshot.status === 'lost'}
           >
             <Lightbulb size={18} weight="bold" aria-hidden="true" />
@@ -256,10 +266,10 @@ export function App() {
       <footer className="site-footer">
         <div className="footer-inner">
           <span>
-            <strong>Minesweeper 101</strong> — 2차원 배열 모델링, Fisher-Yates
-            셔플, Flood Fill(BFS/DFS), 헤드리스 아키텍처 학습 프로젝트
+            <strong>Minesweeper 101</strong> — 누구나 쉽게 배우고 즐기는 클래식
+            지뢰찾기 &amp; 실전 추론 공략 가이드
           </span>
-          <span className="mono">MIT License · docs/01~05 Included</span>
+          <span className="mono">First-Click Safe · Logic Coach</span>
         </div>
       </footer>
     </div>

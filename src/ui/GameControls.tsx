@@ -1,37 +1,35 @@
 import {
   ArrowClockwise,
   Bomb,
+  Crosshair,
   CursorClick,
   Flag,
-  Hash,
   Lightbulb,
+  Medal,
   Smiley,
   SmileyWink,
   SmileyXEyes,
   Timer,
-  TreeStructure,
   Trophy,
-  Waves,
 } from '@phosphor-icons/react';
 import {
   DIFFICULTY_PRESETS,
   type DifficultyKey,
-  type FloodFillAlgorithm,
   type GameSnapshot,
 } from '../core/types';
-import type { ClickActionMode } from './useMinesweeper';
+import type { BestTimesMap, ClickActionMode } from './useMinesweeper';
 
 interface GameControlsProps {
   readonly difficulty: DifficultyKey;
   readonly snapshot: GameSnapshot;
   readonly elapsedSeconds: number;
   readonly actionMode: ClickActionMode;
-  readonly showTraversalOrder: boolean;
+  readonly showNeighborGuide: boolean;
+  readonly bestTimes: BestTimesMap;
   readonly onSelectDifficulty: (key: DifficultyKey) => void;
   readonly onReset: () => void;
   readonly onToggleActionMode: (mode: ClickActionMode) => void;
-  readonly onSelectAlgorithm: (algo: FloodFillAlgorithm) => void;
-  readonly onToggleTraversalOrder: () => void;
+  readonly onToggleNeighborGuide: () => void;
   readonly onRequestHint: () => void;
 }
 
@@ -40,12 +38,12 @@ export function GameControls({
   snapshot,
   elapsedSeconds,
   actionMode,
-  showTraversalOrder,
+  showNeighborGuide,
+  bestTimes,
   onSelectDifficulty,
   onReset,
   onToggleActionMode,
-  onSelectAlgorithm,
-  onToggleTraversalOrder,
+  onToggleNeighborGuide,
   onRequestHint,
 }: GameControlsProps) {
   const presets = Object.values(DIFFICULTY_PRESETS);
@@ -59,6 +57,7 @@ export function GameControls({
     '0'
   );
   const formattedTime = String(elapsedSeconds).padStart(3, '0');
+  const bestTime = bestTimes[difficulty];
 
   const renderStatusIcon = () => {
     if (snapshot.status === 'won') {
@@ -71,12 +70,12 @@ export function GameControls({
   };
 
   return (
-    <section className="controls-panel" aria-label="게임 설정 및 상태 제어">
+    <section className="controls-panel" aria-label="게임 난이도 및 플레이 제어">
       <div className="controls-top-row">
         <div
           className="difficulty-group"
           role="group"
-          aria-label="난이도 프리셋 선택"
+          aria-label="난이도 선택"
         >
           {presets.map((preset) => {
             const isActive = preset.key === difficulty;
@@ -103,10 +102,10 @@ export function GameControls({
             className="utility-btn"
             onClick={onRequestHint}
             disabled={snapshot.status === 'won' || snapshot.status === 'lost'}
-            title="열리지 않은 안전 칸 하나를 하이라이트합니다 (단축키: H)"
+            title="현재 보드에서 추론 가능한 다음 수를 알려줍니다 (단축키: H)"
           >
             <Lightbulb size={16} weight="bold" aria-hidden="true" />
-            <span>안전 힌트</span>
+            <span>공략 힌트</span>
           </button>
           <button
             id="btn-new-game"
@@ -127,27 +126,36 @@ export function GameControls({
           <div className="hud-metric" title="남은 지뢰 수 (전체 지뢰 - 꽂은 깃발)">
             <span className="hud-label">
               <Bomb size={12} weight="bold" aria-hidden="true" />
-              MINES
+              남은 지뢰
             </span>
             <span className="hud-value mono" id="hud-mines-remaining">
               {formattedMines}
             </span>
           </div>
 
-          <div className="hud-metric" title="경과 시간 (초)">
+          <div className="hud-metric" title="현재 게임 경과 시간">
             <span className="hud-label">
               <Timer size={12} weight="bold" aria-hidden="true" />
-              TIME
+              진행 시간
             </span>
             <span className="hud-value mono" id="hud-timer">
               {formattedTime}s
             </span>
           </div>
 
-          <div className="hud-metric hud-metric-progress" title="안전 구역 탐색 진행률">
+          <div className="hud-metric hud-metric-progress" title="안전 칸 탐색률 및 난이도 최고 기록">
             <span className="hud-label">
-              <Trophy size={12} weight="bold" aria-hidden="true" />
-              PROGRESS
+              {bestTime !== undefined ? (
+                <>
+                  <Medal size={12} weight="bold" aria-hidden="true" />
+                  최고 {bestTime}s · 진행률
+                </>
+              ) : (
+                <>
+                  <Trophy size={12} weight="bold" aria-hidden="true" />
+                  안전 칸 진행률
+                </>
+              )}
             </span>
             <span className="hud-value mono" id="hud-progress">
               {snapshot.revealedCount}/{snapshot.safeCellsTotal} ({progressPercent}
@@ -160,7 +168,7 @@ export function GameControls({
           <div
             className="segmented-control desktop-mode-toggle"
             role="group"
-            aria-label="좌클릭 동작 모드"
+            aria-label="클릭 동작 모드"
           >
             <button
               id="mode-reveal-btn"
@@ -184,45 +192,18 @@ export function GameControls({
             </button>
           </div>
 
-          <div
-            className="segmented-control"
-            role="group"
-            aria-label="Flood Fill 알고리즘 선택"
-          >
-            <button
-              id="algo-bfs-btn"
-              type="button"
-              className={`segment-btn ${snapshot.algorithm === 'bfs' ? 'active' : ''}`}
-              onClick={() => onSelectAlgorithm('bfs')}
-              aria-pressed={snapshot.algorithm === 'bfs'}
-              title="큐(Queue) 기반 너비 우선 탐색: 시작점부터 동심원 형태로 확장"
-            >
-              <Waves size={15} weight="bold" aria-hidden="true" />
-              <span>BFS (큐)</span>
-            </button>
-            <button
-              id="algo-dfs-btn"
-              type="button"
-              className={`segment-btn ${snapshot.algorithm === 'dfs' ? 'active' : ''}`}
-              onClick={() => onSelectAlgorithm('dfs')}
-              aria-pressed={snapshot.algorithm === 'dfs'}
-              title="재귀(Recursion) 기반 깊이 우선 탐색: 한 방향 끝까지 파고든 후 백트래킹"
-            >
-              <TreeStructure size={15} weight="bold" aria-hidden="true" />
-              <span>DFS (재귀)</span>
-            </button>
-          </div>
-
           <button
-            id="toggle-traversal-overlay-btn"
+            id="toggle-neighbor-guide-btn"
             type="button"
-            className={`overlay-toggle-btn ${showTraversalOrder ? 'active' : ''}`}
-            onClick={onToggleTraversalOrder}
-            aria-pressed={showTraversalOrder}
-            title="Flood Fill로 열린 각 칸의 탐색 순번(#1, #2...)을 보드 위에 표시합니다"
+            className={`overlay-toggle-btn ${showNeighborGuide ? 'active' : ''}`}
+            onClick={onToggleNeighborGuide}
+            aria-pressed={showNeighborGuide}
+            title="열린 숫자 위에 마우스를 올리면 해당 숫자가 영향을 미치는 주변 8칸 범위를 표시합니다"
           >
-            <Hash size={15} weight="bold" aria-hidden="true" />
-            <span>{showTraversalOrder ? '탐색 순서: ON' : '탐색 순서: OFF'}</span>
+            <Crosshair size={15} weight="bold" aria-hidden="true" />
+            <span>
+              {showNeighborGuide ? '주변 8칸 가이드: ON' : '주변 8칸 가이드: OFF'}
+            </span>
           </button>
         </div>
       </div>
